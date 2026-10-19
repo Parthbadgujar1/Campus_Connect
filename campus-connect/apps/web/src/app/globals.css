@@ -5,9 +5,9 @@
 
 /* ══════════════════════════════════════════════════════════════════════════
    CampusConnect brand
-   Deep Blueberry #302675 (brand, primary actions, active navigation)
-   Cream #F8F5ED (page background)  ·  Soda Green #B8F28B (highlights, positive accents)
-   Ink #252333 (headings and body)  ·  White (cards, menus, panels)
+   Light (Day): Blue #2563EB for actions and links, Violet #8B5CF6 for highlights,
+   white page, #F8FAFC cards, Slate #0F172A text. Night and Dusk keep Deep Blueberry
+   #302675 and Soda Green #B8F28B.
    Fonts: Kalam for headings and highlight labels, Patrick Hand for body text,
    Inter for navigation, buttons and forms.
    Four ambiences set on <html data-theme>: day, night, paper, dusk.
@@ -15,39 +15,40 @@
 
 :root,
 [data-theme="day"] {
-  --bg: #f8f5ed;
-  --surface: #ffffff;
-  --surface-solid: #ffffff;
-  --surface-2: #f1ede3;
-  --surface-3: #e6e0d2;
-  --border: #e4ddcd;
-  --text: #252333;
-  --text-2: #55526a;
-  --text-3: #716e86;
-  --accent: #302675;
-  --accent-ink: #ffffff;
-  --accent-soft: #e9e7f6;
-  --accent-soft-ink: #302675;
-  --mark: #302675;
-  --mark-soft: #e6e3f7;
-  --highlight: #b8f28b;
-  --highlight-ink: #1e3a12;
-  --success: #2b6e30;
-  --success-soft: #e4f8d6;
-  --warning: #8f5f10;
-  --warning-soft: #f8edcf;
-  --danger: #b3362f;
-  --danger-soft: #f8e3e0;
-  --info: #3a5ba8;
-  --info-soft: #e3eaf8;
-  --glass: #ffffff;
-  --glass-border: #e4ddcd;
-  --glass-shadow: 0 12px 32px -14px rgb(37 35 51 / 0.28);
-  --shadow-card: 0 1px 2px rgb(37 35 51 / 0.05);
-  --orb-a: #302675;
-  --orb-b: #302675;
+  --bg: #FFFFFF;
+  --surface: #F8FAFC;
+  --surface-solid: #FFFFFF;
+  --surface-2: #F1F5F9;
+  --surface-3: #E2E8F0;
+  --border: #E2E8F0;
+  --text: #0F172A;
+  --text-2: #475569;
+  --text-3: #64748B;
+  --accent: #2563EB;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #DBEAFE;
+  --accent-soft-ink: #1E40AF;
+  --mark: #7C3AED;
+  --mark-soft: #EDE9FE;
+  --highlight: #8B5CF6;
+  --highlight-ink: #FFFFFF;
+  --success: #047857;
+  --success-soft: #D1FAE5;
+  --warning: #B45309;
+  --warning-soft: #FEF3C7;
+  --danger: #DC2626;
+  --danger-soft: #FEE2E2;
+  --info: #1D4ED8;
+  --info-soft: #DBEAFE;
+  --glass: #FFFFFF;
+  --glass-border: #E2E8F0;
+  --glass-shadow: 0 12px 32px -14px rgb(15 23 42 / 0.18);
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.05);
+  --orb-a: #2563EB;
+  --orb-b: #2563EB;
   --aura-opacity: 0;
   color-scheme: light;
+  --accent-hover: #3B82F6;
 }
 
 [data-theme="night"] {
@@ -84,6 +85,7 @@
   --orb-b: #b8f28b;
   --aura-opacity: 0;
   color-scheme: dark;
+  --accent-hover: #b8f28b;
 }
 
 [data-theme="paper"] {
@@ -120,6 +122,7 @@
   --orb-b: #302675;
   --aura-opacity: 0;
   color-scheme: light;
+  --accent-hover: #302675;
 }
 
 [data-theme="dusk"] {
@@ -156,15 +159,16 @@
   --orb-b: #f2c27b;
   --aura-opacity: 0;
   color-scheme: dark;
+  --accent-hover: #f2c27b;
 }
 
 /* Daylight: chat backgrounds follow the time of day a message was sent. */
 :root,
 [data-theme="day"] {
-  --day-morning: #fbf1e4;
-  --day-afternoon: #eef0fa;
-  --day-evening: #efebf8;
-  --day-night: #e5e2f1;
+  --day-morning: #EFF6FF;
+  --day-afternoon: #F8FAFC;
+  --day-evening: #F5F3FF;
+  --day-night: #E2E8F0;
 }
 [data-theme="night"] {
   --day-morning: #1c1834;
@@ -199,6 +203,7 @@
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-accent-soft-ink: var(--accent-soft-ink);
+  --color-accent-hover: var(--accent-hover);
   --color-mark: var(--mark);
   --color-mark-soft: var(--mark-soft);
   --color-highlight: var(--highlight);

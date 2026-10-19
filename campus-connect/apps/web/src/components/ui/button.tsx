@@ -20,7 +20,7 @@ export function buttonClass({
     size === 'sm' && 'h-9 px-3.5 text-[14px]',
     size === 'md' && 'h-11 px-5 text-[15px]',
     size === 'lg' && 'h-[52px] px-6 text-[15px]',
-    variant === 'primary' && 'bg-accent text-accent-ink hover:opacity-90',
+    variant === 'primary' && 'bg-accent text-accent-ink hover:bg-accent-hover hover:opacity-90',
     variant === 'secondary' && 'border border-border bg-surface text-text hover:bg-surface-2',
     variant === 'soft' && 'bg-accent-soft text-accent-soft-ink hover:opacity-90',
     variant === 'ghost' && 'text-text-2 hover:bg-surface-2 hover:text-text',

@@ -30,9 +30,7 @@ npx tsc --noEmit -p apps/web/tsconfig.json
 
 ## Design language
 
-Brand: **Deep Blueberry** `#302675` (primary actions, active navigation), **Cream** `#F8F5ED` (page
-background), **Soda Green** `#B8F28B` (highlights and positive accents), **Ink** `#252333` (text), white
-(cards and menus). Typography: **Kalam** for headings and highlight labels (page headings 30–32px bold, section headings 20px), **Patrick Hand** for body text (15–16px), and **Inter** for navigation, buttons and forms (buttons 14–15px semibold, captions 13–14px). All colours are tokens in `src/app/globals.css`, one set per ambience (Day, Night, Paper, Dusk).
+Light theme: **Blue** `#2563EB` for primary actions and links, **Violet** `#8B5CF6` for highlights, a white page, `#F8FAFC` cards and `#0F172A` text. Night and Dusk keep the Deep Blueberry `#302675` and Soda Green `#B8F28B` brand. Typography: **Kalam** for headings and highlight labels (page headings 30–32px bold, section headings 20px), **Patrick Hand** for body text (15–16px), and **Inter** for navigation, buttons and forms (buttons 14–15px semibold, captions 13–14px). All colours are tokens in `src/app/globals.css`, one set per ambience (Day, Night, Paper, Dusk).
 
 - **Sign in first.** Students, teachers, industry experts and the campus office sign in at `/login`. Each
   role lands on its own Home: students see the feed, teachers their lecture and question tools, experts
