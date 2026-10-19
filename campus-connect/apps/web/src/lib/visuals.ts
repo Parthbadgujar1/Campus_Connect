@@ -1,0 +1,50 @@
+// Deterministic colours for avatars, covers and media placeholders. The app has no
+// real images yet, so every visual is derived from a stable seed string.
+
+function hash(seed: string): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+// A small family of calm hues (periwinkle, lavender, sky, teal, mint, rose, peach), so every
+// generated colour in the app feels like it belongs to the same soothing palette.
+const CALM_HUES = [228, 246, 266, 288, 206, 190, 168, 338, 14];
+
+export function hueFor(seed: string): number {
+  return CALM_HUES[hash(seed) % CALM_HUES.length];
+}
+
+export function hashString(seed: string): number {
+  return hash(seed);
+}
+
+// A flat, muted colour per seed (no gradients), dark enough for white initials and icons.
+// The name is historical: it is used as a CSS `background` value everywhere.
+export function gradientFor(seed: string): string {
+  return `hsl(${hueFor(seed)} 30% 46%)`;
+}
+
+export function initials(name: string): string {
+  return name
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+export function formatINR(amount: number): string {
+  return new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+export function compactNumber(value: number): string {
+  return new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
+}

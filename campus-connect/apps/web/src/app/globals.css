@@ -1,0 +1,463 @@
+@import "tailwindcss";
+
+/* `dark:` follows the app's own ambience (Night and Dusk are dark), not the OS setting. */
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CampusConnect brand
+   Deep Blueberry #302675 (brand, primary actions, active navigation)
+   Cream #F8F5ED (page background)  ·  Soda Green #B8F28B (highlights, positive accents)
+   Ink #252333 (headings and body)  ·  White (cards, menus, panels)
+   Font: Inter (400 / 500 / 600 / 700) everywhere.
+   Four ambiences set on <html data-theme>: day, night, paper, dusk.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+:root,
+[data-theme="day"] {
+  --bg: #f8f5ed;
+  --surface: #ffffff;
+  --surface-solid: #ffffff;
+  --surface-2: #f1ede3;
+  --surface-3: #e6e0d2;
+  --border: #e4ddcd;
+  --text: #252333;
+  --text-2: #55526a;
+  --text-3: #716e86;
+  --accent: #302675;
+  --accent-ink: #ffffff;
+  --accent-soft: #e9e7f6;
+  --accent-soft-ink: #302675;
+  --highlight: #b8f28b;
+  --highlight-ink: #1e3a12;
+  --success: #2b6e30;
+  --success-soft: #e4f8d6;
+  --warning: #8f5f10;
+  --warning-soft: #f8edcf;
+  --danger: #b3362f;
+  --danger-soft: #f8e3e0;
+  --info: #3a5ba8;
+  --info-soft: #e3eaf8;
+  --glass: #ffffff;
+  --glass-border: #e4ddcd;
+  --glass-shadow: 0 12px 32px -14px rgb(37 35 51 / 0.28);
+  --shadow-card: 0 1px 2px rgb(37 35 51 / 0.05);
+  --orb-a: #302675;
+  --orb-b: #302675;
+  --aura-opacity: 0;
+  color-scheme: light;
+}
+
+[data-theme="night"] {
+  --bg: #13112a;
+  --surface: #1c1939;
+  --surface-solid: #1c1939;
+  --surface-2: #25214a;
+  --surface-3: #302a5a;
+  --border: #342e5f;
+  --text: #f4f2fb;
+  --text-2: #c7c2e2;
+  --text-3: #9690b6;
+  --accent: #b8f28b;
+  --accent-ink: #13112a;
+  --accent-soft: rgb(184 242 139 / 0.14);
+  --accent-soft-ink: #d3f8b5;
+  --highlight: #b8f28b;
+  --highlight-ink: #13112a;
+  --success: #8ee0a3;
+  --success-soft: rgb(142 224 163 / 0.14);
+  --warning: #f2c46d;
+  --warning-soft: rgb(242 196 109 / 0.14);
+  --danger: #f59a90;
+  --danger-soft: rgb(245 154 144 / 0.14);
+  --info: #9dbbf2;
+  --info-soft: rgb(157 187 242 / 0.14);
+  --glass: #1c1939;
+  --glass-border: #342e5f;
+  --glass-shadow: 0 12px 32px -10px rgb(0 0 0 / 0.6);
+  --shadow-card: none;
+  --orb-a: #b8f28b;
+  --orb-b: #b8f28b;
+  --aura-opacity: 0;
+  color-scheme: dark;
+}
+
+[data-theme="paper"] {
+  --bg: #f3ecdc;
+  --surface: #fbf7ee;
+  --surface-solid: #fbf7ee;
+  --surface-2: #ede4d0;
+  --surface-3: #e2d7be;
+  --border: #dfd3bb;
+  --text: #2c2838;
+  --text-2: #57536a;
+  --text-3: #7d7889;
+  --accent: #302675;
+  --accent-ink: #ffffff;
+  --accent-soft: #e4e0f2;
+  --accent-soft-ink: #302675;
+  --highlight: #b8f28b;
+  --highlight-ink: #1e3a12;
+  --success: #2b6e30;
+  --success-soft: #e4ecd3;
+  --warning: #8f5f10;
+  --warning-soft: #f0e2c4;
+  --danger: #a33a2f;
+  --danger-soft: #f1dbd1;
+  --info: #3a5ba8;
+  --info-soft: #e2e5ef;
+  --glass: #fbf7ee;
+  --glass-border: #dfd3bb;
+  --glass-shadow: 0 10px 30px -14px rgb(60 45 20 / 0.28);
+  --shadow-card: 0 1px 2px rgb(60 45 20 / 0.05);
+  --orb-a: #302675;
+  --orb-b: #302675;
+  --aura-opacity: 0;
+  color-scheme: light;
+}
+
+[data-theme="dusk"] {
+  --bg: #171329;
+  --surface: #211b3a;
+  --surface-solid: #211b3a;
+  --surface-2: #2a2448;
+  --surface-3: #352e58;
+  --border: #382f5c;
+  --text: #f3e8d8;
+  --text-2: #cfc3b0;
+  --text-3: #9c917e;
+  --accent: #f2c27b;
+  --accent-ink: #1a130e;
+  --accent-soft: rgb(242 194 123 / 0.15);
+  --accent-soft-ink: #f6d6a4;
+  --highlight: #b8f28b;
+  --highlight-ink: #13112a;
+  --success: #bccb8e;
+  --success-soft: rgb(188 203 142 / 0.14);
+  --warning: #efc278;
+  --warning-soft: rgb(239 194 120 / 0.14);
+  --danger: #ef9c87;
+  --danger-soft: rgb(239 156 135 / 0.14);
+  --info: #cdb89e;
+  --info-soft: rgb(205 184 158 / 0.14);
+  --glass: #211b3a;
+  --glass-border: #382f5c;
+  --glass-shadow: 0 12px 32px -10px rgb(0 0 0 / 0.65);
+  --shadow-card: none;
+  --orb-a: #f2c27b;
+  --orb-b: #f2c27b;
+  --aura-opacity: 0;
+  color-scheme: dark;
+}
+
+/* Daylight: chat backgrounds follow the time of day a message was sent. */
+:root,
+[data-theme="day"] {
+  --day-morning: #fbf1e4;
+  --day-afternoon: #eef0fa;
+  --day-evening: #efebf8;
+  --day-night: #e5e2f1;
+}
+[data-theme="night"] {
+  --day-morning: #1c1834;
+  --day-afternoon: #171d35;
+  --day-evening: #1d1838;
+  --day-night: #120f26;
+}
+[data-theme="paper"] {
+  --day-morning: #f6e8d6;
+  --day-afternoon: #efe9da;
+  --day-evening: #ece2d2;
+  --day-night: #e3dac8;
+}
+[data-theme="dusk"] {
+  --day-morning: #241c3a;
+  --day-afternoon: #1f1934;
+  --day-evening: #251c36;
+  --day-night: #171329;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-solid: var(--surface-solid);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-soft-ink: var(--accent-soft-ink);
+  --color-highlight: var(--highlight);
+  --color-highlight-ink: var(--highlight-ink);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-glass: var(--glass);
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--glass-shadow);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-read: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", monospace;
+}
+
+/* Motion tokens: emitted to :root so plain CSS can use them, and as `ease-*` / `animate-*` utilities. */
+@theme {
+  --ease-drift: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+  --animate-rise: rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-page: page-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-fade: fade 0.3s ease-out backwards;
+  --animate-sheet: sheet-up 0.48s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-dialog: dialog-in 0.36s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  --animate-pop: pop 0.45s cubic-bezier(0.34, 1.4, 0.5, 1) backwards;
+  --animate-breathe: breathe 4.8s ease-in-out infinite;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-spin-slow: spin-slow 14s linear infinite;
+  --animate-ripple: ripple 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  --animate-bloom: bloom 0.42s cubic-bezier(0.34, 1.4, 0.5, 1) backwards;
+  --animate-grow-x: grow-x 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    background: var(--bg);
+  }
+  body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    color: var(--text);
+    background: transparent;
+    overflow-x: hidden;
+    transition: color 0.5s var(--ease-drift);
+  }
+  [data-theme="paper"] body {
+    font-size: 1.04rem;
+  }
+  [data-theme="paper"] p {
+    line-height: 1.75;
+  }
+  button,
+  [role="button"],
+  summary {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 12px;
+  }
+  ::selection {
+    background: var(--accent-soft);
+    color: var(--text);
+  }
+}
+
+@layer components {
+  /* Floating surfaces (dock, menus): solid, with a hairline and a soft shadow. No frosted blur. */
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+  }
+
+  /* Accent disc for small emphasis marks (empty states, the Discover tab). Flat, no shine. */
+  .orb {
+    background: var(--accent);
+  }
+
+  /* Plain page background. */
+  .aura {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--bg);
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+  /* Content zoom for the text-size setting (layout scales with it). */
+  [data-text="sm"] .app-zoom {
+    zoom: 0.94;
+  }
+  [data-text="lg"] .app-zoom {
+    zoom: 1.1;
+  }
+  .press {
+    transition: transform 0.25s var(--ease-spring);
+  }
+  .press:active {
+    transform: scale(0.96);
+  }
+}
+
+/* ── Motion ─────────────────────────────────────────────────────────────── */
+
+@keyframes rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+/* Entrances use `backwards` fill: once finished they leave no transform or filter behind,
+   so fixed children (composers, docks, overlays) keep the viewport as their containing block. */
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-up {
+  from { transform: translateY(105%); }
+  to { transform: translateY(0); }
+}
+@keyframes dialog-in {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+@keyframes ripple {
+  from { transform: scale(0.4); opacity: 0.6; }
+  to { transform: scale(2.4); opacity: 0; }
+}
+@keyframes bloom {
+  from { opacity: 0; transform: translate(var(--from-x, 0), var(--from-y, 24px)) scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes dots {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-3px); }
+}
+@keyframes grow-x {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes snap-countdown {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 107; }
+}
+
+@keyframes party-float {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  15% { opacity: 1; transform: translateY(-20px) scale(1.1); }
+  50% { transform: translate(10px, -90px) scale(1); }
+  100% { opacity: 0; transform: translate(-8px, -180px) scale(0.9); }
+}
+/* Heart-like double-tap burst on loops. */
+@keyframes burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-12deg); }
+  25% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(4deg); }
+  60% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: translate(-50%, -120%) scale(0.9); }
+}
+/* Focus timer: the ring breathes in for 4s and out for 4s. */
+@keyframes breath-guide {
+  0%, 100% { transform: scale(0.82); }
+  50% { transform: scale(1); }
+}
+
+.animate-grow-x { transform-origin: left; }
+.party-float { animation: party-float 2.4s var(--ease-drift) forwards; }
+.burst { animation: burst 0.9s var(--ease-drift) forwards; }
+.breath-guide { animation: breath-guide 8s ease-in-out infinite; }
+
+/* Staggered entrance: children rise one after another. */
+.stagger > * {
+  animation: rise 0.35s var(--ease-drift) backwards;
+}
+.stagger > :nth-child(2) { animation-delay: 25ms; }
+.stagger > :nth-child(3) { animation-delay: 50ms; }
+.stagger > :nth-child(4) { animation-delay: 75ms; }
+.stagger > :nth-child(5) { animation-delay: 100ms; }
+.stagger > :nth-child(6) { animation-delay: 125ms; }
+.stagger > :nth-child(7) { animation-delay: 150ms; }
+.stagger > :nth-child(8) { animation-delay: 175ms; }
+.stagger > :nth-child(n + 9) { animation-delay: 200ms; }
+
+.typing-dot {
+  animation: dots 1.3s ease-in-out infinite;
+}
+.typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+.live-shimmer {
+  color: var(--danger);
+}
+
+/* 3D flip for flashcards and the memory game. */
+.flip-scene { perspective: 1200px; }
+.flip-card {
+  transform-style: preserve-3d;
+  transition: transform 0.6s var(--ease-drift);
+}
+.flip-card[data-flipped="true"] { transform: rotateY(180deg); }
+.flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-back { transform: rotateY(180deg); }
+
+/* Calm mode: switch off movement everywhere. */
+[data-motion="reduce"] *,
+[data-motion="reduce"] *::before,
+[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
