@@ -80,7 +80,7 @@ export function SectionHeader({
       {action && (
         <Link
           href={action.href}
-          className="shrink-0 text-[13px] font-semibold text-accent hover:underline"
+          className="font-sans shrink-0 text-[13px] font-semibold text-accent hover:underline"
         >
           {action.label}
         </Link>

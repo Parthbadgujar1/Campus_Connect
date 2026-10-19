@@ -16,7 +16,7 @@ export function buttonClass({
   className?: string;
 } = {}) {
   return cn(
-    'press inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-[background-color,color,box-shadow,opacity] duration-300 select-none',
+    'press font-sans inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-semibold transition-[background-color,color,box-shadow,opacity] duration-300 select-none',
     size === 'sm' && 'h-9 px-3.5 text-[14px]',
     size === 'md' && 'h-11 px-5 text-[15px]',
     size === 'lg' && 'h-[52px] px-6 text-[15px]',

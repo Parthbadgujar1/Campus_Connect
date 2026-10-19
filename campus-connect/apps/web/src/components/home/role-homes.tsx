@@ -98,7 +98,7 @@ export function TeacherHome() {
                     <span className="block text-[13px] font-semibold text-text-3">{question.topic}</span>
                     <span className="line-clamp-2 block text-[15px] font-semibold leading-snug">{question.body}</span>
                   </span>
-                  <span className="shrink-0 rounded-full bg-accent-soft px-2.5 py-0.5 text-[12px] font-semibold text-accent-soft-ink">
+                  <span className="hand-label shrink-0 bg-mark-soft px-2.5 py-0.5 text-[13px] text-mark">
                     {question.answers.length === 0 ? 'Unanswered' : `${question.answers.length} answers`}
                   </span>
                 </Link>

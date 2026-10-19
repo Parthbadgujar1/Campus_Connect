@@ -8,7 +8,8 @@
    Deep Blueberry #302675 (brand, primary actions, active navigation)
    Cream #F8F5ED (page background)  ·  Soda Green #B8F28B (highlights, positive accents)
    Ink #252333 (headings and body)  ·  White (cards, menus, panels)
-   Font: Inter (400 / 500 / 600 / 700) everywhere.
+   Fonts: Kalam for headings and highlight labels, Patrick Hand for body text,
+   Inter for navigation, buttons and forms.
    Four ambiences set on <html data-theme>: day, night, paper, dusk.
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -27,6 +28,8 @@
   --accent-ink: #ffffff;
   --accent-soft: #e9e7f6;
   --accent-soft-ink: #302675;
+  --mark: #302675;
+  --mark-soft: #e6e3f7;
   --highlight: #b8f28b;
   --highlight-ink: #1e3a12;
   --success: #2b6e30;
@@ -61,6 +64,8 @@
   --accent-ink: #13112a;
   --accent-soft: rgb(184 242 139 / 0.14);
   --accent-soft-ink: #d3f8b5;
+  --mark: #c9c2ff;
+  --mark-soft: rgb(140 128 255 / 0.2);
   --highlight: #b8f28b;
   --highlight-ink: #13112a;
   --success: #8ee0a3;
@@ -95,6 +100,8 @@
   --accent-ink: #ffffff;
   --accent-soft: #e4e0f2;
   --accent-soft-ink: #302675;
+  --mark: #3d2f80;
+  --mark-soft: #e6e0f3;
   --highlight: #b8f28b;
   --highlight-ink: #1e3a12;
   --success: #2b6e30;
@@ -129,6 +136,8 @@
   --accent-ink: #1a130e;
   --accent-soft: rgb(242 194 123 / 0.15);
   --accent-soft-ink: #f6d6a4;
+  --mark: #cfc6ff;
+  --mark-soft: rgb(160 150 255 / 0.18);
   --highlight: #b8f28b;
   --highlight-ink: #13112a;
   --success: #bccb8e;
@@ -190,6 +199,8 @@
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-accent-soft-ink: var(--accent-soft-ink);
+  --color-mark: var(--mark);
+  --color-mark-soft: var(--mark-soft);
   --color-highlight: var(--highlight);
   --color-highlight-ink: var(--highlight-ink);
   --color-success: var(--success);
@@ -204,8 +215,8 @@
   --shadow-card: var(--shadow-card);
   --shadow-float: var(--glass-shadow);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-read: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-kalam), "Segoe Print", cursive, ui-sans-serif, system-ui, sans-serif;
+  --font-read: var(--font-patrick), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "SF Mono", monospace;
 }
 
@@ -234,12 +245,29 @@
     background: var(--bg);
   }
   body {
-    font-family: var(--font-sans);
+    font-family: var(--font-read);
     font-weight: 400;
+    font-synthesis-weight: none;
     color: var(--text);
     background: transparent;
     overflow-x: hidden;
     transition: color 0.5s var(--ease-drift);
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+  }
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  nav {
+    font-family: var(--font-sans);
   }
   [data-theme="paper"] body {
     font-size: 1.04rem;
@@ -459,5 +487,13 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@layer components {
+  /* Highlight labels: Kalam on a soft, slightly uneven marker stroke. */
+  .hand-label {
+    font-family: var(--font-display);
+    border-radius: 1.1em 0.7em 1em 0.6em / 0.7em 1em 0.6em 1.1em;
   }
 }

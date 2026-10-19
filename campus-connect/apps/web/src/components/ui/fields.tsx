@@ -58,7 +58,7 @@ export function Switch({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 px-4 py-3.5">
+    <div className="font-sans flex items-center justify-between gap-4 px-4 py-3.5">
       <div className="min-w-0">
         <p className="text-[15px] font-semibold">{label}</p>
         {description && <p className="text-[13px] text-text-3">{description}</p>}

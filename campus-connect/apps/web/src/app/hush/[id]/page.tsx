@@ -47,7 +47,7 @@ export default function HushQuestionPage() {
 
       <article className="mt-4 rounded-2xl border border-border bg-surface p-5">
         <div className="flex items-center justify-between gap-3">
-          <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[13px] font-semibold text-accent-soft-ink">{question.topic}</span>
+          <span className="hand-label bg-mark-soft px-2.5 py-0.5 text-[13px] text-mark">{question.topic}</span>
           <button
             type="button"
             aria-pressed={following}

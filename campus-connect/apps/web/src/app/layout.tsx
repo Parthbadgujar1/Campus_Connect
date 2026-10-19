@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Kalam, Patrick_Hand } from 'next/font/google';
 import { Providers } from '@/components/shell/providers';
 import { AppShell } from '@/components/shell/app-shell';
 import './globals.css';
 
-// One typeface everywhere: Inter (400, 500, 600, 700).
+// Three typefaces, one job each: Kalam for headings and highlight labels,
+// Patrick Hand for body text, Inter for navigation, buttons and forms.
 const inter = Inter({ variable: '--font-inter', subsets: ['latin'], weight: ['400', '500', '600', '700'], display: 'swap' });
+const kalam = Kalam({ variable: '--font-kalam', subsets: ['latin'], weight: ['400', '700'], display: 'swap' });
+const patrickHand = Patrick_Hand({ variable: '--font-patrick', subsets: ['latin'], weight: ['400'], display: 'swap' });
 
 export const metadata: Metadata = {
   title: {
@@ -44,7 +47,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} h-full antialiased`}
+      className={`${inter.variable} ${kalam.variable} ${patrickHand.variable} h-full antialiased`}
       data-theme="day"
       data-mode="light"
       data-text="md"

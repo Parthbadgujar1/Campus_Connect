@@ -42,7 +42,7 @@ export function OpportunityCard({ opportunity }: { opportunity: Opportunity }) {
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5 text-[12px] font-semibold">
-        <span className="rounded-full bg-accent-soft px-2.5 py-1 text-accent-soft-ink">{opportunity.kind}</span>
+        <span className="hand-label bg-mark-soft px-2.5 py-1 text-mark">{opportunity.kind}</span>
         <span className="rounded-full bg-surface-2 px-2.5 py-1 text-text-2">{opportunity.mode}</span>
         <span className="rounded-full bg-success-soft px-2.5 py-1 text-success">{opportunity.pay}</span>
         {stage && <span className="rounded-full bg-info-soft px-2.5 py-1 text-info">{stage}</span>}

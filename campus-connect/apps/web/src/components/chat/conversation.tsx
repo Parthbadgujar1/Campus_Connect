@@ -803,7 +803,7 @@ export function ConversationView({
                   <li key={memberId} className="flex items-center gap-3 text-sm">
                     <Avatar name={memberId === 'me' ? me.name : getPerson(memberId).name} seed={memberId === 'me' ? me.id : memberId} size="sm" />
                     <span className="font-medium">{memberId === 'me' ? 'You' : getPerson(memberId).name}</span>
-                    {index === 0 && mode !== 'direct' && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-soft-ink">Admin</span>}
+                    {index === 0 && mode !== 'direct' && <span className="hand-label bg-mark-soft px-2 py-0.5 text-[13px] text-mark">Admin</span>}
                   </li>
                 ))}
               </ul>
