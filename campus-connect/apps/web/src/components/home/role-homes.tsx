@@ -22,7 +22,7 @@ function Header({ name }: { name: string }) {
     <header className="pt-safe flex items-start justify-between gap-4 pt-6 md:pt-10">
       <div>
         <p className="text-[14px] text-text-3">{dateLabel}</p>
-        <h1 className="mt-1 text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Hi, {firstName(name)}</h1>
+        <h1 className="marker-heading mt-1 text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Hi, {firstName(name)}</h1>
       </div>
       <span className="md:hidden">
         <AmbienceButton />

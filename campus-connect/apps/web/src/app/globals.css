@@ -8,7 +8,7 @@
    Light (Day): Blue #2563EB for actions and links, Violet #8B5CF6 for highlights,
    white page, #F8FAFC cards, Slate #0F172A text. Night and Dusk keep Deep Blueberry
    #302675 and Soda Green #B8F28B.
-   Fonts: Kalam for headings and highlight labels, Patrick Hand for body text,
+   Fonts: Caveat Brush for titles and highlight labels, Caveat for body text,
    Inter for navigation, buttons and forms.
    Four ambiences set on <html data-theme>: day, night, paper, dusk.
    ══════════════════════════════════════════════════════════════════════════ */
@@ -29,7 +29,7 @@
   --accent-soft: #DBEAFE;
   --accent-soft-ink: #1E40AF;
   --mark: #7C3AED;
-  --mark-soft: #EDE9FE;
+  --mark-soft: #DDD6FE;
   --highlight: #8B5CF6;
   --highlight-ink: #FFFFFF;
   --success: #047857;
@@ -220,8 +220,8 @@
   --shadow-card: var(--shadow-card);
   --shadow-float: var(--glass-shadow);
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-kalam), "Segoe Print", cursive, ui-sans-serif, system-ui, sans-serif;
-  --font-read: var(--font-patrick), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-caveat-brush), "Segoe Print", cursive, ui-sans-serif, system-ui, sans-serif;
+  --font-read: var(--font-caveat), "Segoe Print", cursive, ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "SF Mono", monospace;
 }
 
@@ -253,6 +253,7 @@
     font-family: var(--font-read);
     font-weight: 400;
     font-synthesis-weight: none;
+    font-size-adjust: 0.47;
     color: var(--text);
     background: transparent;
     overflow-x: hidden;
@@ -271,8 +272,20 @@
   select,
   textarea,
   label,
-  nav {
+  nav,
+  .font-sans,
+  .font-mono,
+  code,
+  kbd,
+  pre {
     font-family: var(--font-sans);
+    font-size-adjust: none;
+  }
+  .font-mono,
+  code,
+  kbd,
+  pre {
+    font-family: var(--font-mono);
   }
   [data-theme="paper"] body {
     font-size: 1.04rem;
@@ -496,7 +509,24 @@
 }
 
 @layer components {
-  /* Highlight labels: Kalam on a soft, slightly uneven marker stroke. */
+  /* Titles: a marker swipe across the lower half of the words, like a highlighter pass. */
+  .marker-title,
+  .marker-heading {
+    padding: 0 0.16em;
+    margin-inline: -0.16em;
+    background-image: linear-gradient(transparent 46%, var(--mark-soft) 46%, var(--mark-soft) 92%, transparent 92%);
+    border-radius: 4px 10px 5px 11px / 8px 4px 10px 5px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .marker-title {
+    display: inline;
+  }
+  .marker-heading {
+    display: inline-block;
+  }
+
+  /* Highlight labels: Caveat Brush on a soft, slightly uneven marker stroke. */
   .hand-label {
     font-family: var(--font-display);
     border-radius: 1.1em 0.7em 1em 0.6em / 0.7em 1em 0.6em 1.1em;

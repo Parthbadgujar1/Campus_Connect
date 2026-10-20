@@ -71,7 +71,7 @@ export default function LoginPage() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-10">
       <p className="text-[14px] font-semibold text-accent">CampusConnect</p>
-      <h1 className="mt-2 text-[30px] font-bold leading-tight tracking-tight">Sign in to {college.shortName}</h1>
+      <h1 className="marker-heading mt-2 text-[30px] font-bold leading-tight tracking-tight">Sign in to {college.shortName}</h1>
       <p className="mt-2 text-[15px] text-text-2">Use your college email. Choose how you're joining today.</p>
 
       <div role="radiogroup" aria-label="Who are you?" className="mt-7 grid gap-2.5">

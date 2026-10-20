@@ -47,7 +47,7 @@ function StudentHome() {
       <header className="pt-safe flex items-start justify-between gap-4 pt-6 md:pt-10">
         <div className="min-w-0">
           <p className="text-[14px] text-text-3">{dateLabel}</p>
-          <h1 className="mt-1 text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Hi, {me.name.split(' ')[0]}</h1>
+          <h1 className="marker-heading mt-1 text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Hi, {me.name.split(' ')[0]}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-1">
           <span className="md:hidden">

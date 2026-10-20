@@ -51,7 +51,7 @@ export function PageHeader({
       {leading}
       <div className="min-w-0 flex-1 py-3 md:py-0">
         <h1 className="truncate text-[30px] font-bold leading-tight tracking-tight md:whitespace-normal md:text-[32px]">
-          {title}
+          <span className="marker-title">{title}</span>
         </h1>
         {subtitle && <p className="truncate text-[13px] text-text-3 md:mt-1.5 md:text-[15px]">{subtitle}</p>}
       </div>
@@ -74,7 +74,9 @@ export function SectionHeader({
   return (
     <div className={cn('mb-3.5 flex items-end justify-between gap-3', className)}>
       <div className="min-w-0">
-        <h2 className="text-[20px] font-semibold leading-tight">{title}</h2>
+        <h2 className="text-[20px] font-semibold leading-tight">
+          <span className="marker-title">{title}</span>
+        </h2>
         {description && <p className="mt-0.5 text-[13px] text-text-3">{description}</p>}
       </div>
       {action && (
