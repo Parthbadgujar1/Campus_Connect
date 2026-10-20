@@ -47,7 +47,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <PageHeader title="Admin portal" subtitle="CSMSS · verification, moderation, content and analytics" back backHref="/campus" />
       </div>
 
-      <nav aria-label="Admin sections" className="no-scrollbar mt-3 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-8">
+      <nav aria-label="Admin sections" className="font-sans no-scrollbar mt-3 flex gap-2 overflow-x-auto px-4 pb-1 md:mx-0 md:px-8">
         {SECTIONS.map((section) => {
           const active = section.href === '/admin' ? pathname === '/admin' : pathname.startsWith(section.href);
           const Icon = section.icon;

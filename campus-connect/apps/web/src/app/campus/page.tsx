@@ -95,7 +95,7 @@ export default function CampusPage() {
     <div className="mx-auto w-full max-w-5xl px-4 pb-36 md:px-8 md:pb-16">
       <header className="pt-safe flex items-start justify-between gap-4 pt-6 md:pt-10">
         <div className="min-w-0">
-          <h1 className="marker-heading text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Campus</h1>
+          <h1 className="marker-heading hl-blue text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Campus</h1>
           <p className="mt-1 text-[14px] text-text-3">
             {college.name} · Semester {college.semester}
           </p>

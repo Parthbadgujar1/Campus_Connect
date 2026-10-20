@@ -6,7 +6,7 @@ import type { LucideIcon } from 'lucide-react';
 import { ArrowLeft, ChevronRight, Star } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import { gradientFor } from '@/lib/visuals';
+import { gradientFor, toneFor, type HighlightTone } from '@/lib/visuals';
 
 /**
  * Frosted sticky header on phones; a large editorial title on desktop.
@@ -20,9 +20,11 @@ export function PageHeader({
   actions,
   leading,
   className,
+  tone,
 }: {
   title: string;
   subtitle?: string;
+  tone?: HighlightTone;
   back?: boolean;
   backHref?: string;
   actions?: ReactNode;
@@ -51,7 +53,7 @@ export function PageHeader({
       {leading}
       <div className="min-w-0 flex-1 py-3 md:py-0">
         <h1 className="truncate text-[30px] font-bold leading-tight tracking-tight md:whitespace-normal md:text-[32px]">
-          <span className="marker-title">{title}</span>
+          <span className={`marker-title hl-${tone ?? toneFor(title)}`}>{title}</span>
         </h1>
         {subtitle && <p className="truncate text-[13px] text-text-3 md:mt-1.5 md:text-[15px]">{subtitle}</p>}
       </div>
@@ -65,17 +67,19 @@ export function SectionHeader({
   action,
   description,
   className,
+  tone,
 }: {
   title: string;
   action?: { label: string; href: string };
   description?: string;
   className?: string;
+  tone?: HighlightTone;
 }) {
   return (
     <div className={cn('mb-3.5 flex items-end justify-between gap-3', className)}>
       <div className="min-w-0">
         <h2 className="text-[20px] font-semibold leading-tight">
-          <span className="marker-title">{title}</span>
+          <span className={`marker-title hl-${tone ?? toneFor(title)}`}>{title}</span>
         </h2>
         {description && <p className="mt-0.5 text-[13px] text-text-3">{description}</p>}
       </div>

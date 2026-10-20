@@ -21,6 +21,17 @@ export function hashString(seed: string): number {
   return hash(seed);
 }
 
+// Highlight tones for headings. Each one is a feeling the colour carries:
+// yellow for energy and optimism, green for growth and learning, blue for trust and calm,
+// violet for curiosity and imagination, pink for warmth and people.
+export type HighlightTone = 'violet' | 'blue' | 'yellow' | 'pink' | 'green';
+const HIGHLIGHT_TONES: HighlightTone[] = ['violet', 'blue', 'yellow', 'pink', 'green'];
+
+// A stable tone for any heading that does not choose one, so pages still get varied colour.
+export function toneFor(seed: string): HighlightTone {
+  return HIGHLIGHT_TONES[hash(seed) % HIGHLIGHT_TONES.length];
+}
+
 // A flat, muted colour per seed (no gradients), dark enough for white initials and icons.
 // The name is historical: it is used as a CSS `background` value everywhere.
 export function gradientFor(seed: string): string {

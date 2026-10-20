@@ -117,7 +117,7 @@ export function ChatList() {
     <div className="flex h-full min-h-0 flex-col">
       <div className="pt-safe px-4 md:px-5 md:pt-8">
         <div className="flex items-center justify-between gap-2 py-3 md:py-0">
-          <h1 className="marker-heading text-[30px] font-bold tracking-tight">Chats</h1>
+          <h1 className="marker-heading hl-pink text-[30px] font-bold tracking-tight">Chats</h1>
           <div className="flex items-center gap-1.5">
             <span className="md:hidden">
               <AmbienceButton />
@@ -195,7 +195,7 @@ export function ChatList() {
                   key={community.id}
                   type="button"
                   onClick={() => toast(`${community.name}: announcements and groups (preview)`)}
-                  className="flex w-56 shrink-0 items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 text-left transition-colors hover:border-accent/40"
+                  className="font-read flex w-56 shrink-0 items-center gap-3 rounded-2xl border border-border bg-surface p-3.5 text-left transition-colors hover:border-accent/40"
                 >
                   <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent-soft-ink">
                     <Users className="h-5 w-5" aria-hidden="true" />

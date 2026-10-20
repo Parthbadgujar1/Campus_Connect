@@ -71,7 +71,7 @@ function TabIcon({ tab, active, unread }: { tab: TabItem; active: boolean; unrea
 /** Phone: a standard bottom tab bar. Five equal tabs, the active one in full ink. */
 function TabBar({ section, unread }: { section: Section; unread: number }) {
   return (
-    <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[var(--surface-solid)] pb-[env(safe-area-inset-bottom)] md:hidden">
+    <nav aria-label="Primary" className="font-sans fixed inset-x-0 bottom-0 z-40 border-t border-border bg-[var(--surface-solid)] pb-[env(safe-area-inset-bottom)] md:hidden">
       <ul className="mx-auto grid h-[60px] max-w-[520px] grid-cols-5">
         {TABS.map((tab) => {
           const active = tab.section === section;
@@ -104,7 +104,7 @@ function Rail({ section, unread }: { section: Section; unread: number }) {
       <Link href="/" aria-label="CampusConnect home" className="mb-6 grid h-10 w-10 place-items-center rounded-xl bg-text text-[17px] font-bold text-bg">
         c
       </Link>
-      <nav aria-label="Main" className="flex flex-1 flex-col items-center gap-1">
+      <nav aria-label="Main" className="font-sans flex flex-1 flex-col items-center gap-1">
         {TABS.map((tab) => {
           const active = tab.section === section;
           return (

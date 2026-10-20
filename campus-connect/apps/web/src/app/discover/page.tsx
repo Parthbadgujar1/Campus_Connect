@@ -41,7 +41,7 @@ export default function DiscoverPage() {
     <div className="mx-auto w-full max-w-3xl px-4 pb-28 md:px-8 md:pb-16">
       <header className="pt-safe flex items-start justify-between gap-4 pt-6 md:pt-10">
         <div>
-          <h1 className="marker-heading text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Discover</h1>
+          <h1 className="marker-heading hl-violet text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Discover</h1>
           <p className="mt-1 text-[14px] text-text-3">{NOW.toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })}</p>
         </div>
         <span className="md:hidden">

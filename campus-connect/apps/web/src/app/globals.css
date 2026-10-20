@@ -49,6 +49,11 @@
   --aura-opacity: 0;
   color-scheme: light;
   --accent-hover: #3B82F6;
+  --hl-violet: #DDD6FE;
+  --hl-blue: #BFDBFE;
+  --hl-yellow: #FDE68A;
+  --hl-pink: #FBCFE8;
+  --hl-green: #BBF7D0;
 }
 
 [data-theme="night"] {
@@ -86,6 +91,11 @@
   --aura-opacity: 0;
   color-scheme: dark;
   --accent-hover: #b8f28b;
+  --hl-violet: rgb(167 139 250 / 0.32);
+  --hl-blue: rgb(96 165 250 / 0.3);
+  --hl-yellow: rgb(250 204 21 / 0.26);
+  --hl-pink: rgb(244 114 182 / 0.28);
+  --hl-green: rgb(74 222 128 / 0.26);
 }
 
 [data-theme="paper"] {
@@ -123,6 +133,11 @@
   --aura-opacity: 0;
   color-scheme: light;
   --accent-hover: #302675;
+  --hl-violet: #E2D8F4;
+  --hl-blue: #CFDFF2;
+  --hl-yellow: #F3E3AE;
+  --hl-pink: #F2D2D8;
+  --hl-green: #D2E8CF;
 }
 
 [data-theme="dusk"] {
@@ -160,6 +175,11 @@
   --aura-opacity: 0;
   color-scheme: dark;
   --accent-hover: #f2c27b;
+  --hl-violet: rgb(196 181 253 / 0.22);
+  --hl-blue: rgb(147 197 253 / 0.2);
+  --hl-yellow: rgb(252 211 77 / 0.2);
+  --hl-pink: rgb(249 168 212 / 0.2);
+  --hl-green: rgb(134 239 172 / 0.18);
 }
 
 /* Daylight: chat backgrounds follow the time of day a message was sent. */
@@ -253,7 +273,7 @@
     font-family: var(--font-read);
     font-weight: 400;
     font-synthesis-weight: none;
-    font-size-adjust: 0.47;
+    font-size-adjust: 0.53;
     color: var(--text);
     background: transparent;
     overflow-x: hidden;
@@ -272,7 +292,6 @@
   select,
   textarea,
   label,
-  nav,
   .font-sans,
   .font-mono,
   code,
@@ -286,6 +305,15 @@
   kbd,
   pre {
     font-family: var(--font-mono);
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-display {
+    font-size-adjust: 0.47;
   }
   [data-theme="paper"] body {
     font-size: 1.04rem;
@@ -509,13 +537,13 @@
 }
 
 @layer components {
-  /* Titles: a marker swipe across the lower half of the words, like a highlighter pass. */
+  /* Titles: a full-height marker swipe, one tone per heading (see the hl-* classes). */
   .marker-title,
   .marker-heading {
-    padding: 0 0.16em;
-    margin-inline: -0.16em;
-    background-image: linear-gradient(transparent 46%, var(--mark-soft) 46%, var(--mark-soft) 92%, transparent 92%);
-    border-radius: 4px 10px 5px 11px / 8px 4px 10px 5px;
+    padding: 0.02em 0.2em;
+    margin-inline: -0.2em;
+    background-image: linear-gradient(transparent 14%, var(--hl, var(--mark-soft)) 14%, var(--hl, var(--mark-soft)) 90%, transparent 90%);
+    border-radius: 7px 14px 9px 12px / 11px 7px 13px 8px;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
   }
@@ -524,6 +552,21 @@
   }
   .marker-heading {
     display: inline-block;
+  }
+  .hl-violet {
+    --hl: var(--hl-violet);
+  }
+  .hl-blue {
+    --hl: var(--hl-blue);
+  }
+  .hl-yellow {
+    --hl: var(--hl-yellow);
+  }
+  .hl-pink {
+    --hl: var(--hl-pink);
+  }
+  .hl-green {
+    --hl: var(--hl-green);
   }
 
   /* Highlight labels: Caveat Brush on a soft, slightly uneven marker stroke. */

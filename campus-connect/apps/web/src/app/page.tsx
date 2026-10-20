@@ -47,7 +47,7 @@ function StudentHome() {
       <header className="pt-safe flex items-start justify-between gap-4 pt-6 md:pt-10">
         <div className="min-w-0">
           <p className="text-[14px] text-text-3">{dateLabel}</p>
-          <h1 className="marker-heading mt-1 text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Hi, {me.name.split(' ')[0]}</h1>
+          <h1 className="marker-heading hl-yellow mt-1 text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Hi, {me.name.split(' ')[0]}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-1">
           <span className="md:hidden">
@@ -69,7 +69,7 @@ function StudentHome() {
       <div className="mt-8 space-y-10">
         {/* Happening soon */}
         <section aria-labelledby="soon">
-          <SectionHeader title="Happening soon" action={{ label: 'All events', href: '/events' }} />
+          <SectionHeader tone="yellow" title="Happening soon" action={{ label: 'All events', href: '/events' }} />
           <div className="stagger grid gap-3 md:grid-cols-3">
             {upcoming.map((event) => (
               <Link key={event.id} href={`/events/${event.id}`} className="press flex items-center gap-3.5 rounded-2xl border border-border bg-surface p-3.5 transition-colors hover:border-accent/40">
@@ -95,7 +95,7 @@ function StudentHome() {
         {/* Closing soon and notices */}
         <div className="grid gap-10 md:grid-cols-2">
           <section aria-labelledby="closing">
-            <SectionHeader title="Closing soon" action={{ label: 'Opportunities', href: '/opportunities' }} />
+            <SectionHeader tone="green" title="Closing soon" action={{ label: 'Opportunities', href: '/opportunities' }} />
             <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
               {closing.map((op) => {
                 const days = daysUntil(op.deadline);
@@ -118,7 +118,7 @@ function StudentHome() {
           </section>
 
           <section aria-labelledby="notices">
-            <SectionHeader title="Notices" action={{ label: 'All notices', href: '/news' }} />
+            <SectionHeader tone="blue" title="Notices" action={{ label: 'All notices', href: '/news' }} />
             <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
               {notices.map((notice) => (
                 <li key={notice.id}>
@@ -139,7 +139,7 @@ function StudentHome() {
 
         {/* For you */}
         <section aria-labelledby="stream">
-          <SectionHeader title="For you" description="Picked from your classes, spaces and people you follow" />
+          <SectionHeader tone="pink" title="For you" description="Picked from your classes, spaces and people you follow" />
           <Link href="/create" className="press flex items-center gap-3 rounded-2xl border border-border bg-surface p-3 pr-4 transition-colors hover:border-accent/40">
             <Avatar name={me.name} seed={me.id} size="sm" />
             <span className="flex-1 text-[15px] text-text-3">Share a thought, a win or a question</span>
@@ -159,7 +159,7 @@ function StudentHome() {
 
         {/* Boards */}
         <section aria-labelledby="boards">
-          <SectionHeader title="Boards" description="Threads from the spaces you follow" action={{ label: 'Open boards', href: '/spaces' }} />
+          <SectionHeader tone="blue" title="Boards" description="Threads from the spaces you follow" action={{ label: 'Open boards', href: '/spaces' }} />
           <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
             {boardTop.map((thread) => {
               const space = spaces.find((s) => s.slug === thread.spaceSlug);
@@ -185,7 +185,7 @@ function StudentHome() {
 
         {/* Loops */}
         <section aria-labelledby="loops-preview">
-          <SectionHeader title="Loops" description="Short videos from campus" action={{ label: 'Watch all', href: '/loops' }} />
+          <SectionHeader tone="yellow" title="Loops" description="Short videos from campus" action={{ label: 'Watch all', href: '/loops' }} />
           <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0">
             {loops.map((loop) => (
               <Link
@@ -202,7 +202,7 @@ function StudentHome() {
 
         {/* Hush */}
         <section aria-labelledby="hush-preview">
-          <SectionHeader title="Hush" description="Anonymous questions, answered by people who know" action={{ label: 'Open Hush', href: '/hush' }} />
+          <SectionHeader tone="violet" title="Hush" description="Anonymous questions, answered by people who know" action={{ label: 'Open Hush', href: '/hush' }} />
           <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
             {questions.map((question) => (
               <li key={question.id}>

@@ -39,7 +39,7 @@ export default function SpaceRoomPage() {
           </span>
         </Link>
         <p className="mt-5 px-2 text-[11px] font-bold uppercase tracking-wider text-text-3">Text rooms</p>
-        <nav className="mt-1.5 space-y-0.5" aria-label="Rooms">
+        <nav className="font-sans mt-1.5 space-y-0.5" aria-label="Rooms">
           {space.channels.map((c) => {
             const ChannelIcon = c.kind === 'announcements' ? Megaphone : Hash;
             const active = c.id === channel.id;
