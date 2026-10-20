@@ -119,7 +119,7 @@ export default function CampusPage() {
           <Link href="/resources" className="press flex flex-col gap-3 rounded-2xl border border-border bg-surface p-5 transition-colors hover:border-accent/40">
             <FolderOpen className="h-6 w-6 text-accent" strokeWidth={1.8} aria-hidden="true" />
             <span>
-              <span className="block text-[16px] font-semibold">Stacks</span>
+              <span className="block text-[16px] font-semibold">Shelf</span>
               <span className="block text-[14px] text-text-3">Notes and previous papers from students, teachers and the office</span>
             </span>
           </Link>

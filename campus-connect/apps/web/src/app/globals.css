@@ -91,11 +91,11 @@
   --aura-opacity: 0;
   color-scheme: dark;
   --accent-hover: #b8f28b;
-  --hl-violet: rgb(167 139 250 / 0.32);
-  --hl-blue: rgb(96 165 250 / 0.3);
-  --hl-yellow: rgb(250 204 21 / 0.26);
-  --hl-pink: rgb(244 114 182 / 0.28);
-  --hl-green: rgb(74 222 128 / 0.26);
+  --hl-violet: rgb(167 139 250 / 0.42);
+  --hl-blue: rgb(96 165 250 / 0.42);
+  --hl-yellow: rgb(250 204 21 / 0.4);
+  --hl-pink: rgb(244 114 182 / 0.42);
+  --hl-green: rgb(74 222 128 / 0.38);
 }
 
 [data-theme="paper"] {
@@ -175,11 +175,11 @@
   --aura-opacity: 0;
   color-scheme: dark;
   --accent-hover: #f2c27b;
-  --hl-violet: rgb(196 181 253 / 0.22);
-  --hl-blue: rgb(147 197 253 / 0.2);
-  --hl-yellow: rgb(252 211 77 / 0.2);
-  --hl-pink: rgb(249 168 212 / 0.2);
-  --hl-green: rgb(134 239 172 / 0.18);
+  --hl-violet: rgb(196 181 253 / 0.32);
+  --hl-blue: rgb(147 197 253 / 0.32);
+  --hl-yellow: rgb(252 211 77 / 0.32);
+  --hl-pink: rgb(249 168 212 / 0.32);
+  --hl-green: rgb(134 239 172 / 0.3);
 }
 
 /* Daylight: chat backgrounds follow the time of day a message was sent. */

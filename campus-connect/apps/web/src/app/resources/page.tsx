@@ -14,7 +14,7 @@ import type { Resource, ResourceKind } from '@/lib/types';
 import { useAppState } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
-// Stacks: notes and previous papers from students, teachers and the office.
+// Shelf: notes and previous papers from students, teachers and the office.
 const KINDS: ('All' | ResourceKind)[] = ['All', 'Notes', 'Previous papers', 'Syllabus', 'Lab manual', 'Cheat sheet', 'Book'];
 type Contributor = 'All' | 'Student' | 'Teacher' | 'Office';
 
@@ -30,12 +30,12 @@ function contributorOf(resource: Resource): Contributor {
 export default function ResourcesPage() {
   return (
     <Suspense fallback={null}>
-      <Stacks />
+      <Shelf />
     </Suspense>
   );
 }
 
-function Stacks() {
+function Shelf() {
   const params = useSearchParams();
   const toast = useToast();
   const role = useAppState((s) => s.role);
@@ -63,7 +63,7 @@ function Stacks() {
   return (
     <div className="mx-auto w-full max-w-4xl px-4 pb-36 md:px-8 md:pb-16">
       <PageHeader
-        title={reviewing ? 'Review notes' : 'Stacks'}
+        title={reviewing ? 'Review notes' : 'Shelf'}
         subtitle={reviewing ? 'Shared notes waiting for approval' : 'Notes and previous papers from your campus'}
         back
         backHref="/campus"
@@ -80,7 +80,7 @@ function Stacks() {
       <div className="mt-4 space-y-4">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-3" aria-hidden="true" />
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes, papers and tags" aria-label="Search stacks" className="pl-10" />
+          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search notes, papers and tags" aria-label="Search shelf" className="pl-10" />
         </div>
 
         <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4" role="group" aria-label="Kind">

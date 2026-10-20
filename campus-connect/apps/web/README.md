@@ -36,7 +36,7 @@ Light theme: **Blue** `#2563EB` for primary actions and links, **Violet** `#8B5C
   role lands on its own Home: students see the feed, teachers their lecture and question tools, experts
   mentoring and referrals, and the office what needs a decision.
 - **Home** (students): Happening soon, Closing soon and Notices, then For you, Boards, Loops and Hush previews.
-- **Campus:** Study first (Focus, Stacks, Your ink, Lectures, Study together), then College life, Career and Living.
+- **Campus:** Study first (Focus, Shelf, Your ink, Lectures, Study together), then College life, Career and Living.
 - **Discover:** Boards (threads from your spaces), Loops (endless short videos), Hush (anonymous
   questions and answers) and Playroom (quick games and live tables), then Pulse, Makers, Beyond campus,
   Meme wall and Crossed paths.
