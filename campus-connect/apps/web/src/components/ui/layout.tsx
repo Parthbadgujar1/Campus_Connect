@@ -144,53 +144,6 @@ export function EmptyState({
   );
 }
 
-export function StatTile({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  tone = 'accent',
-  href,
-}: {
-  label: string;
-  value: string | number;
-  hint?: string;
-  icon?: LucideIcon;
-  tone?: 'accent' | 'success' | 'warning' | 'danger' | 'info';
-  href?: string;
-}) {
-  const toneClass = {
-    accent: 'bg-accent-soft text-accent-soft-ink',
-    success: 'bg-success-soft text-success',
-    warning: 'bg-warning-soft text-warning',
-    danger: 'bg-danger-soft text-danger',
-    info: 'bg-info-soft text-info',
-  }[tone];
-  const body = (
-    <>
-      <div className="flex items-center gap-2 text-[13px] font-medium text-text-3">
-        {Icon && (
-          <span className={cn('grid h-7 w-7 place-items-center rounded-xl', toneClass)}>
-            <Icon className="h-4 w-4" />
-          </span>
-        )}
-        <span className="truncate">{label}</span>
-      </div>
-      <p className="mt-2 font-display text-[28px] font-semibold leading-none tracking-tight">{value}</p>
-      {hint && <p className="mt-1.5 truncate text-xs text-text-3">{hint}</p>}
-    </>
-  );
-  const cls = 'rounded-2xl border border-border bg-surface p-4 shadow-card';
-  if (href) {
-    return (
-      <Link href={href} className={cn(cls, 'press transition-colors hover:border-accent/40')}>
-        {body}
-      </Link>
-    );
-  }
-  return <div className={cls}>{body}</div>;
-}
-
 export function ProgressBar({
   value,
   max = 100,
@@ -221,29 +174,6 @@ export function ProgressBar({
       className={cn('h-2 w-full overflow-hidden rounded-full bg-surface-3', className)}
     >
       <div className="h-full rounded-full transition-[width] duration-700 ease-drift" style={{ width: `${pct}%`, background: fill }} />
-    </div>
-  );
-}
-
-export function ScoreRing({ value, size = 54 }: { value: number; size?: number }) {
-  const radius = 20;
-  const circumference = 2 * Math.PI * radius;
-  return (
-    <div className="relative grid shrink-0 place-items-center" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 48 48" width={size} height={size} className="-rotate-90" aria-hidden="true">
-        <circle cx="24" cy="24" r={radius} fill="none" strokeWidth="4" className="stroke-surface-3" />
-        <circle
-          cx="24"
-          cy="24"
-          r={radius}
-          fill="none"
-          strokeWidth="4"
-          strokeLinecap="round"
-          className="stroke-accent transition-[stroke-dasharray] duration-700"
-          strokeDasharray={`${circumference * (value / 100)} ${circumference}`}
-        />
-      </svg>
-      <span className="absolute text-[11px] font-bold">{value}%</span>
     </div>
   );
 }
@@ -319,48 +249,6 @@ export function ListRow({
     <button type="button" onClick={onClick} className={cls}>
       {content}
     </button>
-  );
-}
-
-/** Page-level hero used on detail screens: a soft gradient field with floating orbs. */
-export function DetailHero({
-  seed,
-  icon: Icon,
-  eyebrow,
-  title,
-  children,
-  className,
-}: {
-  seed: string;
-  icon?: LucideIcon;
-  eyebrow?: string;
-  title: string;
-  children?: ReactNode;
-  className?: string;
-}) {
-  return (
-    <section className={cn('overflow-hidden rounded-3xl border border-border bg-surface shadow-card', className)}>
-      <div
-        aria-hidden="true"
-        className="relative flex h-40 items-end justify-between overflow-hidden p-5 text-white md:h-48"
-        style={{ background: gradientFor(seed) }}
-      >
-        {eyebrow && (
-          <span className="relative rounded-full bg-white/20 px-3 py-1 text-xs font-semibold">
-            {eyebrow}
-          </span>
-        )}
-        {Icon && (
-          <span className="relative grid h-14 w-14 place-items-center rounded-2xl bg-white/20">
-            <Icon className="h-7 w-7" />
-          </span>
-        )}
-      </div>
-      <div className="p-5 md:p-6">
-        <h2 className="font-display text-[24px] font-semibold leading-tight tracking-tight md:text-[30px]">{title}</h2>
-        {children && <div className="mt-3.5 space-y-3">{children}</div>}
-      </div>
-    </section>
   );
 }
 

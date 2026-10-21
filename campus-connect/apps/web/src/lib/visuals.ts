@@ -17,10 +17,6 @@ export function hueFor(seed: string): number {
   return CALM_HUES[hash(seed) % CALM_HUES.length];
 }
 
-export function hashString(seed: string): number {
-  return hash(seed);
-}
-
 // Highlight tones for headings. Each one is a feeling the colour carries:
 // yellow for energy and optimism, green for growth and learning, blue for trust and calm,
 // violet for curiosity and imagination, pink for warmth and people.
@@ -46,16 +42,4 @@ export function initials(name: string): string {
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase() ?? '')
     .join('');
-}
-
-export function formatINR(amount: number): string {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-export function compactNumber(value: number): string {
-  return new Intl.NumberFormat('en-IN', { notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }

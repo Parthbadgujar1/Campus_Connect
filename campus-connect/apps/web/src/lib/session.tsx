@@ -9,9 +9,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, get, patch, post, type ApiError } from './api/client';
-import type { ApiRole, Me, SessionPayload, Settings } from './api/types';
+import type { Me, SessionPayload, Settings } from './api/types';
 import { appActions, setSeenListener } from './store';
-import type { Role } from './types';
 
 export type SessionStatus = 'loading' | 'signed-in' | 'signed-out' | 'unavailable';
 
@@ -35,12 +34,6 @@ interface SessionValue {
 
 const SessionContext = createContext<SessionValue | null>(null);
 
-/** Moderators use the admin tools in the UI; the API still checks the real role on every call. */
-export function uiRole(role: ApiRole): Role {
-  if (role === 'moderator' || role === 'admin') return 'admin';
-  return role;
-}
-
 function applyAppearance(settings: Settings) {
   appActions.hydrateSettings({ theme: settings.theme, textSize: settings.textSize, font: settings.font, reduceMotion: settings.reduceMotion, seen: settings.seen });
 }
@@ -54,7 +47,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const enter = useCallback(async (me: Me) => {
     setUser(me);
-    appActions.signIn({ role: uiRole(me.role), name: me.profile.displayName, email: me.email });
     try {
       const s = await get<Settings>('/me/settings');
       setSettings(s);
@@ -68,7 +60,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const leave = useCallback(() => {
     setUser(null);
     setSettings(null);
-    appActions.signOut();
     setStatus('signed-out');
   }, []);
 

@@ -93,7 +93,6 @@ const schema = z.object({
   PRIVACY_EMAIL: z.string().default('privacy@campusconnect.local'),
 
   JOBS_ENABLED: bool(true),
-  CLUSTER_WORKERS: z.coerce.number().int().min(1).max(32).default(2),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(10).default(300),
   ENABLE_API_DOCS: bool(true),
 });
@@ -186,7 +185,6 @@ export function parseConfig(source: NodeJS.ProcessEnv = process.env) {
       privacyEmail: env.PRIVACY_EMAIL,
     },
     jobsEnabled: env.JOBS_ENABLED,
-    clusterWorkers: env.CLUSTER_WORKERS,
     rateLimitPerMinute: env.RATE_LIMIT_PER_MINUTE,
     enableApiDocs: env.ENABLE_API_DOCS,
   };

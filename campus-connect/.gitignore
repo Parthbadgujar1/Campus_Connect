@@ -17,9 +17,6 @@ out/
 .env.staging
 *.env.local
 
-# Prisma
-apps/api/prisma/migrations/.gitkeep
-
 # IDE
 .idea/
 .vscode/*.code-workspace

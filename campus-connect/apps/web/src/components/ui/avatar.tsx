@@ -50,32 +50,6 @@ export function Avatar({
   );
 }
 
-/** Rounded tile with a gradient and an icon, for events, spaces and services. */
-export function IconTile({
-  seed,
-  children,
-  size = 'md',
-  className,
-}: {
-  seed: string;
-  children: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-}) {
-  const dims = { sm: 'h-10 w-10 rounded-xl', md: 'h-12 w-12 rounded-2xl', lg: 'h-16 w-16 rounded-2xl' }[size];
-  return (
-    <span
-      aria-hidden="true"
-      className={cn('inline-grid shrink-0 place-items-center text-white', dims, className)}
-      style={{
-        background: `${gradientFor(seed)}`,
-      }}
-    >
-      {children}
-    </span>
-  );
-}
-
 export function VerifiedMark({ className }: { className?: string }) {
   return (
     <BadgeCheck

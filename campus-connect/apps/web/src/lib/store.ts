@@ -1,97 +1,64 @@
 'use client';
 
-// A small client-side store for per-viewer state: ambience, saved items, RSVPs,
-// joined spaces, votes, notes and the demo role. It persists to localStorage
-// (a convenience only; a backend replaces it later).
+// A small client-side store for per-device preferences: appearance (theme, font, text size,
+// motion), which sections have been opened (the "new" dots) and personal study notes. It is
+// saved to localStorage. Appearance and seen markers are also saved to the account, so they
+// follow the person to other devices; notes stay on this device.
 
 import { useSyncExternalStore } from 'react';
-import type { ApplicationStage, Role } from './types';
 import type { Note } from './study';
 
 export type ThemePref = 'system' | 'day' | 'night' | 'paper';
 export type TextSize = 'sm' | 'md' | 'lg';
 /** handwritten = Kalam everywhere (the CampusConnect look), system = the device font, readable = Atkinson Hyperlegible. */
 export type FontPref = 'handwritten' | 'system' | 'readable';
-export type Rsvp = 'going' | 'interested';
-export type Vote = 1 | -1;
-
-export interface Session {
-  role: Role;
-  name: string;
-  email: string;
-}
 
 export interface AppState {
-  /** Signed-in person. Null means the sign-in screen is shown. */
-  session: Session | null;
-  role: Role;
   theme: ThemePref;
   textSize: TextSize;
   font: FontPref;
   reduceMotion: boolean;
-  saved: string[];
-  rsvp: Record<string, Rsvp>;
-  liked: string[];
-  joined: string[];
-  following: string[];
-  subscriptions: string[];
-  votes: Record<string, Vote>;
-  applications: Record<string, ApplicationStage>;
-  readNotifications: string[];
-  blocked: string[];
-  muted: string[];
-  openedSnaps: string[];
-  seenMoments: string[];
-  /** Links the student has opened once; a dot marks the ones not opened yet. */
+  /** Links the person has opened once; a dot marks the ones not opened yet. */
   seen: string[];
-  chatThemes: Record<string, string>;
   notes: Note[];
-  dating: { optIn: boolean; incognito: boolean; campusOnly: boolean; verified18: boolean };
 }
 
 export const STORAGE_KEY = 'cc:v1';
 
 export const INITIAL_STATE: AppState = {
-  session: null,
-  role: 'student',
   theme: 'system',
   textSize: 'md',
   font: 'handwritten',
   reduceMotion: false,
-  saved: [],
-  rsvp: {},
-  liked: [],
-  joined: ['gdsc', 'dsa-club'],
-  following: [],
-  subscriptions: ['ch-anita'],
-  votes: {},
-  applications: {},
-  readNotifications: [],
-  blocked: [],
-  muted: [],
-  openedSnaps: [],
-  seenMoments: [],
   seen: [],
-  chatThemes: {},
   notes: [],
-  dating: { optIn: false, incognito: false, campusOnly: true, verified18: false },
 };
 
 let snapshot: AppState = INITIAL_STATE;
 let hydrated = false;
 const listeners = new Set<() => void>();
 
+const THEMES: ThemePref[] = ['system', 'day', 'night', 'paper'];
+const SIZES: TextSize[] = ['sm', 'md', 'lg'];
+const FONTS: FontPref[] = ['handwritten', 'system', 'readable'];
+// Early builds stored three sample notes on every device.
+const SAMPLE_NOTES = new Set(['note-normal', 'note-deadlock', 'note-hackathon']);
+
+/** Reads only the fields above, so keys left by older builds (sample data, a copy of the profile) are dropped. */
 function readStorage(): AppState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return INITIAL_STATE;
-    // Older builds also kept flashcard decks here; that feature was removed, so they are dropped.
-    const { decks: _decks, ...stored } = JSON.parse(raw) as Partial<AppState> & { decks?: unknown };
-    void _decks;
-    const saved = { ...INITIAL_STATE, ...stored };
-    // Early builds stored three sample notes on every device; drop them.
-    const samples = new Set(['note-normal', 'note-deadlock', 'note-hackathon']);
-    return { ...saved, font: (saved.font as string) === 'classic' ? 'handwritten' : saved.font, notes: (saved.notes ?? []).filter((n) => !samples.has(n.id)) };
+    const s = JSON.parse(raw) as Record<string, unknown>;
+    const theme = s.theme === 'dusk' ? 'night' : s.theme;
+    return {
+      theme: THEMES.includes(theme as ThemePref) ? (theme as ThemePref) : INITIAL_STATE.theme,
+      textSize: SIZES.includes(s.textSize as TextSize) ? (s.textSize as TextSize) : INITIAL_STATE.textSize,
+      font: FONTS.includes(s.font as FontPref) ? (s.font as FontPref) : INITIAL_STATE.font,
+      reduceMotion: s.reduceMotion === true,
+      seen: Array.isArray(s.seen) ? s.seen.filter((x): x is string => typeof x === 'string') : [],
+      notes: Array.isArray(s.notes) ? (s.notes as Note[]).filter((n) => n && typeof n.id === 'string' && !SAMPLE_NOTES.has(n.id)) : [],
+    };
   } catch {
     return INITIAL_STATE;
   }
@@ -101,6 +68,12 @@ function getSnapshot(): AppState {
   if (!hydrated && typeof window !== 'undefined') {
     snapshot = readStorage();
     hydrated = true;
+    // Rewrite once so old keys are removed from the device too.
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+    } catch {
+      // Storage blocked: nothing to clean.
+    }
   }
   return snapshot;
 }
@@ -128,78 +101,26 @@ export function setSeenListener(fn: ((href: string) => void) | null) {
   onSeen = fn;
 }
 
-function toggleIn(list: string[], id: string): string[] {
-  return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
-}
-
 export const appActions = {
-  setRole: (role: Role) => setState((s) => ({ ...s, role })),
-  signIn: (session: Session) => setState((s) => ({ ...s, session, role: session.role })),
-  signOut: () => setState((s) => ({ ...s, session: null })),
   setTheme: (theme: ThemePref) => setState((s) => ({ ...s, theme })),
   setTextSize: (textSize: TextSize) => setState((s) => ({ ...s, textSize })),
   setFont: (font: FontPref) => setState((s) => ({ ...s, font })),
+  setReduceMotion: (reduceMotion: boolean) => setState((s) => ({ ...s, reduceMotion })),
   /** Applies appearance and seen markers loaded from the server. */
   hydrateSettings: (patch: Partial<Pick<AppState, 'theme' | 'textSize' | 'font' | 'reduceMotion'>> & { seen?: string[] }) =>
     setState((s) => ({ ...s, ...patch, seen: patch.seen ? Array.from(new Set([...s.seen, ...patch.seen])) : s.seen })),
-  setReduceMotion: (reduceMotion: boolean) => setState((s) => ({ ...s, reduceMotion })),
-  toggleSaved: (id: string) => setState((s) => ({ ...s, saved: toggleIn(s.saved, id) })),
-  toggleLiked: (id: string) => setState((s) => ({ ...s, liked: toggleIn(s.liked, id) })),
   markSeen: (href: string) =>
     setState((s) => {
       if (s.seen.includes(href)) return s;
       onSeen?.(href);
       return { ...s, seen: [...s.seen, href] };
     }),
-  toggleJoined: (id: string) => setState((s) => ({ ...s, joined: toggleIn(s.joined, id) })),
-  toggleFollowing: (id: string) => setState((s) => ({ ...s, following: toggleIn(s.following, id) })),
-  toggleSubscribed: (id: string) =>
-    setState((s) => ({ ...s, subscriptions: toggleIn(s.subscriptions, id) })),
-  toggleBlocked: (id: string) => setState((s) => ({ ...s, blocked: toggleIn(s.blocked, id) })),
-  toggleMuted: (id: string) => setState((s) => ({ ...s, muted: toggleIn(s.muted, id) })),
-  vote: (id: string, value: Vote) =>
-    setState((s) => {
-      const votes = { ...s.votes };
-      if (votes[id] === value) delete votes[id];
-      else votes[id] = value;
-      return { ...s, votes };
-    }),
-  setRsvp: (eventId: string, value: Rsvp | null) =>
-    setState((s) => {
-      const rsvp = { ...s.rsvp };
-      if (value) rsvp[eventId] = value;
-      else delete rsvp[eventId];
-      return { ...s, rsvp };
-    }),
-  applyFor: (id: string) =>
-    setState((s) => ({ ...s, applications: { ...s.applications, [id]: 'Applied' } })),
-  setApplicationStage: (id: string, stage: ApplicationStage) =>
-    setState((s) => ({ ...s, applications: { ...s.applications, [id]: stage } })),
-  withdrawApplication: (id: string) =>
-    setState((s) => {
-      const applications = { ...s.applications };
-      delete applications[id];
-      return { ...s, applications };
-    }),
-  markRead: (ids: string[]) =>
-    setState((s) => ({
-      ...s,
-      readNotifications: Array.from(new Set([...s.readNotifications, ...ids])),
-    })),
-  openSnap: (id: string) =>
-    setState((s) => (s.openedSnaps.includes(id) ? s : { ...s, openedSnaps: [...s.openedSnaps, id] })),
-  seeMoment: (id: string) =>
-    setState((s) => (s.seenMoments.includes(id) ? s : { ...s, seenMoments: [...s.seenMoments, id] })),
-  setChatTheme: (chatId: string, theme: string) =>
-    setState((s) => ({ ...s, chatThemes: { ...s.chatThemes, [chatId]: theme } })),
   saveNote: (note: Note) =>
     setState((s) => {
       const exists = s.notes.some((n) => n.id === note.id);
       return { ...s, notes: exists ? s.notes.map((n) => (n.id === note.id ? note : n)) : [note, ...s.notes] };
     }),
   deleteNote: (id: string) => setState((s) => ({ ...s, notes: s.notes.filter((n) => n.id !== id) })),
-  setDating: (patch: Partial<AppState['dating']>) =>
-    setState((s) => ({ ...s, dating: { ...s.dating, ...patch } })),
 };
 
 /** Subscribe a component to a slice of the store. Keep selectors returning stable values. */

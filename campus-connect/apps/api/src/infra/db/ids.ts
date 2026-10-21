@@ -26,8 +26,3 @@ export function uuidv7(): string {
   const hex = bytes.toString('hex');
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
-
-export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Id for one-per-pair documents (a follow, a like, a membership), so duplicates are impossible. */
-export const pairId = (...parts: string[]) => parts.join(':');

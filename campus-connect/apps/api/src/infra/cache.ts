@@ -5,7 +5,7 @@ import type { Logger } from 'pino';
 // Redis is used when it is reachable (shared across API processes). If Redis is down or not
 // configured, the same calls fall back to a bounded in-process memory cache, so the API keeps
 // working (slightly less efficiently) instead of failing. Nothing correctness-critical lives
-// only in the cache: sessions, votes and messages are always in Postgres.
+// only in the cache: sessions, votes and messages are always in MongoDB.
 
 export interface CacheStatus {
   backend: 'redis' | 'memory';

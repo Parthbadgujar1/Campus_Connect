@@ -1,91 +1,64 @@
-# CampusConnect — Web app (mobile-first front end)
+# CampusConnect — web app
 
-This is the front end for the CampusConnect student platform. It is one React codebase that works
-two ways:
+One Next.js codebase that works two ways:
 
-- **On a phone:** an app layout with a bottom tab bar: **Home · Campus · Discover · Chats · You**.
-  The site is installable to the home screen (PWA manifest and icon).
-- **On a computer:** the web portal, with a slim rail on the left and split views for chats and
-  Space rooms.
+- **Phone:** an app layout with a bottom tab bar (Home · Campus · Discover · Chats · You),
+  installable to the home screen.
+- **Desktop:** a slim rail on the left, wider pages and side-by-side chats.
 
-It is built with Next.js (App Router) and React. **In this phase it runs entirely on mock data.**
-The backend has been removed from the repository for the UI/UX phase and will be added later. See
-[`docs/product/module-roadmap.md`](../../docs/product/module-roadmap.md) for what each module
-includes and when it ships.
+Every screen reads live data from the CampusConnect API (`apps/api`).
 
 ## Run it
 
 ```bash
-# from campus-connect/
-npm install
-npm run dev --workspace=web      # http://localhost:3000
-```
-
-Check the production build and types:
-
-```bash
+# from campus-connect/, with the API running on http://127.0.0.1:4000
+npm run dev --workspace=web          # http://localhost:3000
+npm run type-check --workspace=web
 npm run build --workspace=web
-npx tsc --noEmit -p apps/web/tsconfig.json
 ```
 
-## Design language
+The browser calls `/api/v1/...` on the web app itself and Next forwards it to the API
+(`API_ORIGIN`, default `http://127.0.0.1:4000`), so session cookies stay first-party and there
+are no CORS preflights. `npm run dev:alt` starts a second dev server on port 3001 with its own
+build folder.
 
-Light theme: **Blue** `#2563EB` for primary actions and links, **Violet** `#8B5CF6` for highlights, a white page, `#F8FAFC` cards and `#0F172A` text. Night and Dusk keep the Deep Blueberry `#302675` and Soda Green `#B8F28B` brand. Typography: **Caveat Brush** for titles and highlight labels (page titles 30–32px, section titles 20px), with a full-height marker swipe behind titles, in five tones chosen by section; **Caveat** for body text; and **Inter** for navigation, buttons and forms (buttons 14–15px semibold, captions 13–14px). All colours are tokens in `src/app/globals.css`, one set per ambience (Day, Night, Paper, Dusk).
+## Look and feel
 
-- **Sign in first.** Students, teachers, industry experts and the campus office sign in at `/login`. Each
-  role lands on its own Home: students see the feed, teachers their lecture and question tools, experts
-  mentoring and referrals, and the office what needs a decision.
-- **Home** (students): Happening soon, Closing soon and Notices, then For you, Boards, Loops and Hush previews.
-- **Campus:** Study first (Focus, Shelf, Your ink, Lectures, Study together), then College life, Career and Living.
-- **Discover:** Boards (threads from your spaces), Loops (endless short videos), Hush (anonymous
-  questions and answers) and Playroom (quick games and live tables), then Pulse, Makers, Beyond campus,
-  Meme wall and Crossed paths.
-- **Chats:** notes above your friends, a camera for quick snaps, communities with their groups, filters,
-  read receipts, and per-chat actions. Inside a chat: reply, forward, copy, delete for you, reactions,
-  saved messages, disappearing messages, calls on Google Meet or Jitsi, and group admins.
-- **Profile:** a complete profile for you (posts, loops, about, badges, your ink) and a matching public
-  profile for everyone else.
-- **Ambiences.** Day, Night, Paper (reading) and Dusk, plus text size and Calm motion.
+- **Font:** Kalam for everything (titles, text, buttons, forms). Settings → Appearance also
+  offers the device font and Atkinson Hyperlegible for people who find them easier to read.
+- **Themes:** Day, Night and Paper, plus text size and reduced motion. All colours are tokens in
+  `src/app/globals.css`, one set per theme; components never hard-code colours.
+- **Motion:** Framer Motion through `src/components/motion` (respects reduced motion).
+- **Lists** load more as you scroll and always end with a clear "You've reached the end".
 
 ## Structure
 
 ```
 src/
-  app/                   Routes (one folder per screen; about 75 screens)
-    layout.tsx           Root layout, fonts, ambience init script, app shell
-    page.tsx             Home: greeting, live campus, Moments, "Your day" flow, Stream
-    campus/              Campus hub: college, live places, study tools, shelves
-    discover/            Discover: worlds bento (Watch, Spaces, Loops, Arcade, Study) and live now
-    chats/               Split-view chats (list + conversation)
-    you/                 Profile hub, momentum, ambience, Kept
-    spaces/              Spaces index, space (board/rooms/events/members/about), threads, rooms, new
-    watch/               Watch hub, video player (v/[id]), watch parties (party/[id])
-    loops/               Full-screen loops
-    games/               Arcade, memory, reflex, quiz
-    study/               Study hub, focus timer, notes
-    admin/               Admin portal (role-gated) — students, moderation, lectures, content, announcements
+  app/             Routes, one folder per screen (App Router)
+    admin/         Admin console: overview, approvals, people, moderation, surveys,
+                   feedback, inbox, system (sections shown per role)
   components/
-    shell/               App shell (dock, rail, aura), ambience panel, providers
-    ui/                  Primitives: buttons, chips, tabs, sheet, toast, fields, layout
-    chat/                Conversation view (lanes, bloom, snaps) and chat list
-    feed/                Post card, Moments rail and viewer
-    spaces/ watch/       Votes; video cards
-    common/ events/      Shared cards (tickets, market, housing, opportunities), map, QR
-  data/                  Mock data, typed (`src/lib/types.ts`), one file per domain
+    shell/         App shell (tab bar, rail), appearance panel, providers, survey gate
+    ui/            Buttons, chips, fields, sheets, toasts, states, infinite list
+    motion/        Animation helpers
+    chat/ feed/ spaces/ hush/ market/ events/ opportunities/ people/ surveys/ admin/ ...
   lib/
-    store.ts             Per-viewer state (ambience, kept, RSVP, joined, votes, notes…), persisted locally
-    time.ts              Fixed prototype clock (Wed 14 Oct 2026, IST) and date helpers
-    nav.ts               Tabs, route-to-tab mapping, full-screen routes
+    api/           client.ts (fetch, CSRF, uploads), hooks.ts (useQuery, useInfinite,
+                   useAction, invalidate), types.ts and modules.ts (API response types)
+    session.tsx    Signed-in user and their saved appearance settings
+    roles.ts       What each role can see (tabs, tiles, admin sections, page gates)
+    realtime.ts    One WebSocket for chats, typing and read receipts, with reconnect
+    store.ts       Per-device preferences and personal notes (localStorage)
+    nav.ts         Tabs and which tab each route belongs to
 ```
 
 ## Conventions
 
-- **Screens depend on the data getters, not on fixed arrays.** When the backend arrives, change the
-  data layer (`src/data`) to fetch and keep the screens as they are.
-- **Mobile first.** Phone layouts are checked at 375px. Desktop adds the rail and split views.
-- **Colours are tokens** in `src/app/globals.css`, defined once per ambience. Do not hard-code
-  colours in components.
-- **Entrance animations are short and use `backwards` fill**, so a finished animation leaves no transform or
-  filter behind. A lasting transform would trap `position: fixed` children (docks, composers).
-- **Demo role.** You → Preview as switches between Student, Faculty and Admin. The real app takes
-  the role from sign-in.
+- **Data comes from the API hooks.** Use `useQuery` / `useInfinite` with a cache key, and
+  `invalidate('prefix')` after a change so every screen showing that data refreshes.
+- **Roles:** check `can(user, 'capability')` from `lib/roles.ts` before showing a tab or button.
+  The API checks every action again, so hiding is a convenience, not the protection.
+- **Mobile first:** layouts are checked at 375px wide; desktop adds the rail.
+- **Entrance animations finish without a lasting transform**, which would trap
+  `position: fixed` children (tab bar, composers).

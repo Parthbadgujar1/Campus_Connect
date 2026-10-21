@@ -15,7 +15,7 @@ import { sendError } from './error-handler.js';
 //      limits on sensitive routes (sign-in, sign-up, password reset, contact form, uploads).
 //      With Redis the limits are shared by all API processes; if Redis is down, limiting is
 //      skipped rather than blocking everyone (availability over strictness), and the sign-in
-//      lockout still works because it is stored in Postgres.
+//      lockout still works because it is stored in MongoDB.
 
 export default fp(
   async function traffic(app: FastifyInstance) {

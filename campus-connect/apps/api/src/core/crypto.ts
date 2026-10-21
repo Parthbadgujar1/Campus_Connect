@@ -5,10 +5,6 @@ export function randomToken(prefix: string, bytes = 32): string {
   return `${prefix}_${randomBytes(bytes).toString('base64url')}`;
 }
 
-export function randomId(bytes = 16): string {
-  return randomBytes(bytes).toString('base64url');
-}
-
 export function sha256(value: string | Buffer): Buffer {
   return createHash('sha256').update(value).digest();
 }

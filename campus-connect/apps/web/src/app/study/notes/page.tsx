@@ -8,7 +8,7 @@ import { EmptyState, PageHeader } from '@/components/ui/layout';
 import { useToast } from '@/components/ui/toast';
 import type { Note } from '@/lib/study';
 import { appActions, useAppState } from '@/lib/store';
-import { relativeTime } from '@/lib/time';
+import { ago } from '@/lib/live-time';
 import { hueFor } from '@/lib/visuals';
 import { cn } from '@/lib/utils';
 
@@ -90,7 +90,7 @@ export default function NotesPage() {
                   </span>
                   <span className="mt-1 block truncate font-display text-[17px] font-semibold">{note.title || 'Untitled'}</span>
                   <span className="mt-0.5 line-clamp-2 block text-sm text-text-3">{note.body || 'Empty page'}</span>
-                  <span className="mt-2 block text-[11px] text-text-3">{relativeTime(note.updatedAt)}</span>
+                  <span className="mt-2 block text-[11px] text-text-3">{ago(note.updatedAt)}</span>
                 </button>
               ))}
             </div>

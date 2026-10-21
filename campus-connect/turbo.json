@@ -28,12 +28,6 @@
         "^type-check"
       ]
     },
-    "test": {
-      "dependsOn": [
-        "^build"
-      ],
-      "cache": false
-    },
     "clean": {
       "cache": false
     }

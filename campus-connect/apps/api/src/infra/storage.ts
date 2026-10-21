@@ -12,7 +12,7 @@ import type { Config } from '../config/env.js';
 // Object storage for uploads. Two drivers share one interface:
 //   local - files on disk under var/storage (development, single server)
 //   s3    - any S3-compatible service (Cloudflare R2, AWS S3, MinIO)
-// The bytes never pass through Postgres; the database keeps metadata only (see `files`).
+// The bytes never pass through MongoDB; the database keeps metadata only (see `files`).
 // A circuit breaker isolates storage outages: uploads and downloads fail with a clear 503 while
 // every feature that does not touch files keeps working.
 
