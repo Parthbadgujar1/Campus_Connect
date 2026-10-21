@@ -6,10 +6,12 @@
 
 import { useSyncExternalStore } from 'react';
 import type { ApplicationStage, Role } from './types';
-import { seedNotes, type Note } from '@/data/study';
+import type { Note } from './study';
 
-export type ThemePref = 'system' | 'day' | 'night' | 'paper' | 'dusk';
+export type ThemePref = 'system' | 'day' | 'night' | 'paper';
 export type TextSize = 'sm' | 'md' | 'lg';
+/** handwritten = Kalam everywhere (the CampusConnect look), system = the device font, readable = Atkinson Hyperlegible. */
+export type FontPref = 'handwritten' | 'system' | 'readable';
 export type Rsvp = 'going' | 'interested';
 export type Vote = 1 | -1;
 
@@ -25,6 +27,7 @@ export interface AppState {
   role: Role;
   theme: ThemePref;
   textSize: TextSize;
+  font: FontPref;
   reduceMotion: boolean;
   saved: string[];
   rsvp: Record<string, Rsvp>;
@@ -39,6 +42,8 @@ export interface AppState {
   muted: string[];
   openedSnaps: string[];
   seenMoments: string[];
+  /** Links the student has opened once; a dot marks the ones not opened yet. */
+  seen: string[];
   chatThemes: Record<string, string>;
   notes: Note[];
   dating: { optIn: boolean; incognito: boolean; campusOnly: boolean; verified18: boolean };
@@ -51,6 +56,7 @@ export const INITIAL_STATE: AppState = {
   role: 'student',
   theme: 'system',
   textSize: 'md',
+  font: 'handwritten',
   reduceMotion: false,
   saved: [],
   rsvp: {},
@@ -65,8 +71,9 @@ export const INITIAL_STATE: AppState = {
   muted: [],
   openedSnaps: [],
   seenMoments: [],
+  seen: [],
   chatThemes: {},
-  notes: seedNotes,
+  notes: [],
   dating: { optIn: false, incognito: false, campusOnly: true, verified18: false },
 };
 
@@ -78,7 +85,13 @@ function readStorage(): AppState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return INITIAL_STATE;
-    return { ...INITIAL_STATE, ...(JSON.parse(raw) as Partial<AppState>) };
+    // Older builds also kept flashcard decks here; that feature was removed, so they are dropped.
+    const { decks: _decks, ...stored } = JSON.parse(raw) as Partial<AppState> & { decks?: unknown };
+    void _decks;
+    const saved = { ...INITIAL_STATE, ...stored };
+    // Early builds stored three sample notes on every device; drop them.
+    const samples = new Set(['note-normal', 'note-deadlock', 'note-hackathon']);
+    return { ...saved, font: (saved.font as string) === 'classic' ? 'handwritten' : saved.font, notes: (saved.notes ?? []).filter((n) => !samples.has(n.id)) };
   } catch {
     return INITIAL_STATE;
   }
@@ -109,6 +122,12 @@ function subscribe(listener: () => void) {
   };
 }
 
+// The session layer registers this to sync newly opened sections to the server (all devices).
+let onSeen: ((href: string) => void) | null = null;
+export function setSeenListener(fn: ((href: string) => void) | null) {
+  onSeen = fn;
+}
+
 function toggleIn(list: string[], id: string): string[] {
   return list.includes(id) ? list.filter((item) => item !== id) : [...list, id];
 }
@@ -119,9 +138,19 @@ export const appActions = {
   signOut: () => setState((s) => ({ ...s, session: null })),
   setTheme: (theme: ThemePref) => setState((s) => ({ ...s, theme })),
   setTextSize: (textSize: TextSize) => setState((s) => ({ ...s, textSize })),
+  setFont: (font: FontPref) => setState((s) => ({ ...s, font })),
+  /** Applies appearance and seen markers loaded from the server. */
+  hydrateSettings: (patch: Partial<Pick<AppState, 'theme' | 'textSize' | 'font' | 'reduceMotion'>> & { seen?: string[] }) =>
+    setState((s) => ({ ...s, ...patch, seen: patch.seen ? Array.from(new Set([...s.seen, ...patch.seen])) : s.seen })),
   setReduceMotion: (reduceMotion: boolean) => setState((s) => ({ ...s, reduceMotion })),
   toggleSaved: (id: string) => setState((s) => ({ ...s, saved: toggleIn(s.saved, id) })),
   toggleLiked: (id: string) => setState((s) => ({ ...s, liked: toggleIn(s.liked, id) })),
+  markSeen: (href: string) =>
+    setState((s) => {
+      if (s.seen.includes(href)) return s;
+      onSeen?.(href);
+      return { ...s, seen: [...s.seen, href] };
+    }),
   toggleJoined: (id: string) => setState((s) => ({ ...s, joined: toggleIn(s.joined, id) })),
   toggleFollowing: (id: string) => setState((s) => ({ ...s, following: toggleIn(s.following, id) })),
   toggleSubscribed: (id: string) =>

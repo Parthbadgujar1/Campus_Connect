@@ -70,7 +70,7 @@ export function SectionHeader({
   tone,
 }: {
   title: string;
-  action?: { label: string; href: string };
+  action?: { label: string; href: string } | { label: string; onClick: () => void };
   description?: string;
   className?: string;
   tone?: HighlightTone;
@@ -83,13 +83,18 @@ export function SectionHeader({
         </h2>
         {description && <p className="mt-0.5 text-[13px] text-text-3">{description}</p>}
       </div>
-      {action && (
+      {action && 'href' in action && (
         <Link
           href={action.href}
           className="font-sans shrink-0 text-[13px] font-semibold text-accent hover:underline"
         >
           {action.label}
         </Link>
+      )}
+      {action && 'onClick' in action && (
+        <button type="button" onClick={action.onClick} className="font-sans shrink-0 text-[13px] font-semibold text-accent hover:underline">
+          {action.label}
+        </button>
       )}
     </div>
   );

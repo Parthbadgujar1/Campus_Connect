@@ -1,54 +1,25 @@
-import { hashString } from '@/lib/visuals';
-
-const MODULES = 25;
-
-/** Deterministic dark-module positions for a seed, excluding the three finder squares. */
-function qrCells(seed: string): [number, number][] {
-  const inFinder = (x: number, y: number) =>
-    (x < 7 && y < 7) || (x >= MODULES - 7 && y < 7) || (x < 7 && y >= MODULES - 7);
-  let state = hashString(seed) || 1;
-  const cells: [number, number][] = [];
-  for (let y = 0; y < MODULES; y++) {
-    for (let x = 0; x < MODULES; x++) {
-      if (inFinder(x, y)) continue;
-      state = (state * 1103515245 + 12345) & 0x7fffffff;
-      if (state % 2 === 0) cells.push([x, y]);
-    }
-  }
-  return cells;
-}
-
-const finder = (x: number, y: number) => (
-  <g key={`f-${x}-${y}`}>
-    <rect x={x} y={y} width="7" height="7" fill="#0f1424" />
-    <rect x={x + 1} y={y + 1} width="5" height="5" fill="#ffffff" />
-    <rect x={x + 2} y={y + 2} width="3" height="3" fill="#0f1424" />
-  </g>
-);
+import qrcode from 'qrcode-generator';
+import { useMemo } from 'react';
 
 /**
- * Visual stand-in for a QR code. It is deterministic per seed and has the three
- * finder squares, so it reads as a QR in the prototype. Real check-in tokens come
- * from the backend in the next phase.
+ * A real, scannable QR code for `value` (check-in codes, profile links). Drawn as an SVG with
+ * one path, so it stays sharp at any size and prints well. Medium error correction survives
+ * screen glare and a cracked phone screen.
  */
-export function QrCode({ seed, size = 180, label }: { seed: string; size?: number; label: string }) {
-  const cells = qrCells(seed);
+export function QrCode({ value, size = 180, label }: { value: string; size?: number; label: string }) {
+  const { count, path } = useMemo(() => {
+    const qr = qrcode(0, 'M');
+    qr.addData(value);
+    qr.make();
+    const n = qr.getModuleCount();
+    let d = '';
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (qr.isDark(y, x)) d += `M${x} ${y}h1v1h-1z`;
+    return { count: n, path: d };
+  }, [value]);
   return (
-    <svg
-      role="img"
-      aria-label={label}
-      viewBox={`-1 -1 ${MODULES + 2} ${MODULES + 2}`}
-      width={size}
-      height={size}
-      className="rounded-xl bg-white p-2"
-    >
-      <rect x="-1" y="-1" width={MODULES + 2} height={MODULES + 2} fill="#ffffff" />
-      {finder(0, 0)}
-      {finder(MODULES - 7, 0)}
-      {finder(0, MODULES - 7)}
-      {cells.map(([x, y]) => (
-        <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill="#0f1424" />
-      ))}
+    <svg role="img" aria-label={label} viewBox={`-2 -2 ${count + 4} ${count + 4}`} width={size} height={size} shapeRendering="crispEdges" className="rounded-xl bg-white">
+      <rect x={-2} y={-2} width={count + 4} height={count + 4} fill="#ffffff" />
+      <path d={path} fill="#0f1424" />
     </svg>
   );
 }

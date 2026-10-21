@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { BookOpen, Moon, MoonStar, Sun, SunMoon } from 'lucide-react';
+import { BookOpen, Moon, Sun, SunMoon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Sheet } from '@/components/ui/sheet';
 import { Segmented } from '@/components/ui/chip';
 import { Switch } from '@/components/ui/fields';
-import { appActions, useAppState, type TextSize, type ThemePref } from '@/lib/store';
+import { useOptionalSession, type SettingsPatch } from '@/lib/session';
+import { appActions, useAppState, type FontPref, type TextSize, type ThemePref } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 interface ThemeOption {
@@ -23,14 +24,78 @@ export const THEME_OPTIONS: ThemeOption[] = [
   { value: 'day', label: 'Day', hint: 'Light and clear', icon: Sun, swatch: ['#ffffff', '#f8fafc', '#2563eb'] },
   { value: 'night', label: 'Night', hint: 'Deep and restful', icon: Moon, swatch: ['#13112a', '#1c1939', '#b8f28b'] },
   { value: 'paper', label: 'Paper', hint: 'Reading mode, warm and still', icon: BookOpen, swatch: ['#f4eee2', '#fcf9f2', '#8a5a3b'] },
-  { value: 'dusk', label: 'Dusk', hint: 'Low blue light for late nights', icon: MoonStar, swatch: ['#171329', '#211b3a', '#f2c27b'] },
 ];
+
+export interface FontOption {
+  value: FontPref;
+  label: string;
+  hint: string;
+  /** The family used for the preview, so each card shows its own font. */
+  family: string;
+}
+
+export const FONT_OPTIONS: FontOption[] = [
+  { value: 'handwritten', label: 'Kalam', hint: 'The CampusConnect look', family: 'var(--font-kalam), cursive' },
+  { value: 'system', label: 'System default', hint: 'Your device’s own font', family: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
+  { value: 'readable', label: 'Easy to read', hint: 'For low vision and dyslexia', family: 'var(--font-atkinson), system-ui, sans-serif' },
+];
+
+/** Applies a change on this device and, when signed in, saves it to the account (all devices). */
+function useAppearance() {
+  const session = useOptionalSession();
+  return (change: SettingsPatch) => {
+    if (session?.status === 'signed-in') {
+      void session.updateSettings(change).catch(() => undefined);
+      return;
+    }
+    if (change.theme) appActions.setTheme(change.theme);
+    if (change.textSize) appActions.setTextSize(change.textSize);
+    if (change.font) appActions.setFont(change.font);
+    if (change.reduceMotion !== undefined) appActions.setReduceMotion(change.reduceMotion);
+  };
+}
+
+/** Font cards; each previews its own typeface. */
+export function FontPicker() {
+  const font = useAppState((s) => s.font);
+  const apply = useAppearance();
+  return (
+    <div role="radiogroup" aria-label="Font" className="grid grid-cols-2 gap-2.5">
+      {FONT_OPTIONS.map((option) => {
+        const selected = option.value === font;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            onClick={() => apply({ font: option.value })}
+            className={cn(
+              'press rounded-2xl border p-3 text-left transition-colors',
+              selected ? 'border-accent bg-accent-soft' : 'border-border bg-surface hover:bg-surface-2',
+            )}
+          >
+            <span className="block text-[26px] leading-none" style={{ fontFamily: option.family }} aria-hidden="true">
+              Aa
+            </span>
+            <span className="mt-1.5 block truncate text-[15px]" style={{ fontFamily: option.family }} aria-hidden="true">
+              Campus life, today
+            </span>
+            <span className="font-sans mt-2 block text-sm font-semibold">{option.label}</span>
+            <span className="font-sans block text-xs text-text-3">{option.hint}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 /** The controls themselves; used in the sheet, on You and in Settings. */
 export function AmbiencePanel({ compact = false }: { compact?: boolean }) {
   const theme = useAppState((s) => s.theme);
   const textSize = useAppState((s) => s.textSize);
   const reduceMotion = useAppState((s) => s.reduceMotion);
+  const apply = useAppearance();
 
   return (
     <div className="space-y-5">
@@ -44,7 +109,7 @@ export function AmbiencePanel({ compact = false }: { compact?: boolean }) {
               type="button"
               role="radio"
               aria-checked={selected}
-              onClick={() => appActions.setTheme(option.value)}
+              onClick={() => apply({ theme: option.value })}
               className={cn(
                 'press group relative overflow-hidden rounded-2xl border p-3 text-left transition-colors',
                 selected ? 'border-accent bg-accent-soft' : 'border-border bg-surface hover:bg-surface-2',
@@ -69,11 +134,16 @@ export function AmbiencePanel({ compact = false }: { compact?: boolean }) {
       </div>
 
       <div className="space-y-2">
+        <p className="text-sm font-semibold">Font</p>
+        <FontPicker />
+      </div>
+
+      <div className="space-y-2">
         <p className="text-sm font-semibold">Text size</p>
         <Segmented<TextSize>
           label="Text size"
           value={textSize}
-          onChange={appActions.setTextSize}
+          onChange={(textSize) => apply({ textSize })}
           options={[
             { value: 'sm', label: 'Smaller' },
             { value: 'md', label: 'Default' },
@@ -87,7 +157,7 @@ export function AmbiencePanel({ compact = false }: { compact?: boolean }) {
           label="Calm motion"
           description="Turn off animations"
           checked={reduceMotion}
-          onChange={appActions.setReduceMotion}
+          onChange={(reduceMotion) => apply({ reduceMotion })}
         />
       </div>
     </div>
@@ -106,8 +176,8 @@ export function AmbienceButton({ className }: { className?: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={`Ambience: ${option.label}. Change theme, reading mode and text size`}
-        title="Ambience"
+        aria-label={`Appearance: ${option.label}. Change theme, font and text size`}
+        title="Appearance"
         className={cn(
           'press grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-surface text-text-2 shadow-card transition-colors hover:text-text',
           className,
@@ -115,7 +185,7 @@ export function AmbienceButton({ className }: { className?: string }) {
       >
         <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
       </button>
-      <Sheet open={open} onClose={() => setOpen(false)} title="Ambience" description="Choose how CampusConnect feels right now">
+      <Sheet open={open} onClose={() => setOpen(false)} title="Appearance" description="Theme, font and text size. Saved to your account.">
         <AmbiencePanel />
       </Sheet>
     </>

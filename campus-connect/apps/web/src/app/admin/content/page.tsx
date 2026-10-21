@@ -1,156 +1,96 @@
 'use client';
 
-import { useState } from 'react';
-import { Check, X } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { Check, ExternalLink, LayoutGrid, X } from 'lucide-react';
+import { get, post } from '@/lib/api/client';
+import { invalidate, useAction, useQuery } from '@/lib/api/hooks';
+import type { QueueItem } from '@/lib/api/modules';
 import { Button } from '@/components/ui/button';
-import { UnderlineTabs } from '@/components/ui/chip';
-import { Card, EmptyState, SectionHeader } from '@/components/ui/layout';
+import { Chip, ChipRow } from '@/components/ui/chip';
+import { Input } from '@/components/ui/fields';
+import { Card, EmptyState } from '@/components/ui/layout';
+import { PersonAvatar } from '@/components/ui/person-avatar';
+import { ErrorState, FormAlert, SkeletonList } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
-import { contentQueue } from '@/data/admin';
-import { communities } from '@/data/communities';
-import { events } from '@/data/events';
-import { resources } from '@/data/learning';
-import { relativeTime } from '@/lib/time';
+import { Stagger, StaggerItem } from '@/components/motion';
+import { useSession } from '@/lib/session';
+import { ago } from '@/lib/live-time';
 
-type Tab = 'Queue' | 'Communities' | 'Events' | 'Clubs' | 'Resources';
+type QueueType = 'resource' | 'lecture' | 'event' | 'opportunity' | 'space';
+const LABEL: Record<QueueType, string> = { resource: 'Shelf uploads', lecture: 'Lectures', event: 'Events', opportunity: 'Opportunities', space: 'Spaces' };
+
+function Item({ type, item, onDone }: { type: QueueType; item: QueueItem; onDone: () => void }) {
+  const toast = useToast();
+  const [note, setNote] = useState('');
+  const decide = useAction(async (decision: 'approve' | 'reject') => {
+    await post(`/admin/queue/${type}/${item.id}`, { decision, note: note.trim() || undefined });
+    toast(decision === 'approve' ? 'Approved and live' : 'Rejected');
+    invalidate('admin:overview');
+    onDone();
+  });
+  return (
+    <Card className="space-y-3 p-4">
+      <div className="flex items-start gap-3">
+        <PersonAvatar person={item.submittedBy} size="sm" />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">{item.title}</p>
+          <p className="text-[13px] text-text-3">{item.submittedBy?.displayName ?? 'Deleted user'} · {ago(item.submittedAt)}</p>
+        </div>
+        <Link href={item.link} target="_blank" className="inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-accent">Preview <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></Link>
+      </div>
+      <Input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Note to the person (optional; helpful when rejecting)" aria-label="Review note" />
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => void decide.run('approve')} disabled={decide.pending}><Check className="h-4 w-4" aria-hidden="true" /> Approve</Button>
+        <Button size="sm" variant="secondary" onClick={() => void decide.run('reject')} disabled={decide.pending}><X className="h-4 w-4" aria-hidden="true" /> Reject</Button>
+      </div>
+      {decide.error && <FormAlert>{decide.error.message}</FormAlert>}
+    </Card>
+  );
+}
+
+function ContentInner() {
+  const { user } = useSession();
+  const params = useSearchParams();
+  const router = useRouter();
+  const allowed: QueueType[] = user?.role === 'faculty' ? ['resource', 'lecture'] : ['resource', 'lecture', 'event', 'opportunity', 'space'];
+  const asked = params.get('tab') as QueueType | null;
+  const tab: QueueType = asked && allowed.includes(asked) ? asked : allowed[0]!;
+  const queue = useQuery<Record<QueueType, QueueItem[]>>('admin:queue', (signal) => get('/admin/queue', undefined, signal));
+  const items = queue.data?.[tab] ?? [];
+  return (
+    <div>
+      <ChipRow>
+        {allowed.map((t) => (
+          <Chip key={t} active={tab === t} onClick={() => router.replace(`/admin/content?tab=${t}`, { scroll: false })}>
+            {LABEL[t]}{queue.data ? ` · ${queue.data[t]?.length ?? 0}` : ''}
+          </Chip>
+        ))}
+      </ChipRow>
+      <div className="mt-4">
+        {queue.loading && <SkeletonList variant="card" count={3} />}
+        {queue.error && <ErrorState error={queue.error} onRetry={queue.reload} />}
+        {queue.data && !items.length && <EmptyState icon={LayoutGrid} title={`No ${LABEL[tab].toLowerCase()} waiting`} description="New submissions appear here, oldest first." />}
+        {items.length > 0 && (
+          <Stagger className="grid gap-3 md:grid-cols-2">
+            {items.map((it) => (
+              <StaggerItem key={it.id}>
+                <Item type={tab} item={it} onDone={() => queue.setData((d) => (d ? { ...d, [tab]: d[tab].filter((x) => x.id !== it.id) } : d))} />
+              </StaggerItem>
+            ))}
+          </Stagger>
+        )}
+        {items.length >= 50 && <p className="mt-3 text-center text-[13px] text-text-3">Showing the 50 oldest. More appear as you review these.</p>}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminContentPage() {
-  const toast = useToast();
-  const [tab, setTab] = useState<Tab>('Queue');
-  const [done, setDone] = useState<string[]>([]);
-
-  const pendingResources = resources.filter((r) => !r.approved);
-  const queue = contentQueue.filter((c) => !done.includes(c.id));
-
-  const act = (id: string, verb: 'Approved' | 'Rejected') => {
-    setDone((d) => [...d, id]);
-    toast(`${verb}. The submitter is notified.`);
-  };
-
   return (
-    <div className="space-y-5 px-4 pb-28 md:px-8 md:pb-12">
-      <UnderlineTabs<Tab>
-        label="Content sections"
-        value={tab}
-        onChange={setTab}
-        options={[
-          { value: 'Queue', label: 'Queue', count: queue.length },
-          { value: 'Communities', label: 'Communities' },
-          { value: 'Events', label: 'Events' },
-          { value: 'Clubs', label: 'Clubs' },
-          { value: 'Resources', label: 'Resources', count: pendingResources.length },
-        ]}
-      />
-
-      {tab === 'Queue' && (
-        <section className="space-y-3">
-          <SectionHeader title="Waiting for approval" description="New communities, clubs, events and shared resources" />
-          {queue.length === 0 && <EmptyState icon={Check} title="Nothing waiting" />}
-          {queue.map((item) => (
-            <Card key={item.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Badge tone="accent">{item.kind}</Badge>
-                  <span className="text-xs text-text-3">{relativeTime(item.at)} ago</span>
-                </div>
-                <p className="mt-1 font-semibold">{item.title}</p>
-                <p className="text-xs text-text-3">Submitted by {item.submittedBy}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => act(item.id, 'Approved')}>
-                  <Check className="h-4 w-4" aria-hidden="true" />
-                  Approve
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => act(item.id, 'Rejected')}>
-                  <X className="h-4 w-4" aria-hidden="true" />
-                  Reject
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </section>
-      )}
-
-      {tab === 'Communities' && (
-        <section className="space-y-3">
-          {communities
-            .filter((c) => c.kind !== 'Club')
-            .map((c) => (
-              <Card key={c.id} className="flex items-center gap-3 p-4">
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{c.name}</p>
-                  <p className="text-xs text-text-3">
-                    {c.kind} · {c.privacy} · {c.members.toLocaleString('en-IN')} members · {c.moderators.join(', ')}
-                  </p>
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => toast('Community settings open (demo)')}>
-                  Manage
-                </Button>
-              </Card>
-            ))}
-        </section>
-      )}
-
-      {tab === 'Events' && (
-        <section className="space-y-3">
-          {events.map((e) => (
-            <Card key={e.id} className="flex items-center gap-3 p-4">
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold">{e.title}</p>
-                <p className="text-xs text-text-3">
-                  {e.category} · {e.organizer} · {e.going} going
-                </p>
-              </div>
-              <Button size="sm" variant="ghost" onClick={() => toast('Event editor opens (demo)')}>
-                Edit
-              </Button>
-            </Card>
-          ))}
-        </section>
-      )}
-
-      {tab === 'Clubs' && (
-        <section className="space-y-3">
-          {communities
-            .filter((c) => c.kind === 'Club')
-            .map((c) => (
-              <Card key={c.id} className="flex items-center gap-3 p-4">
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{c.name}</p>
-                  <p className="text-xs text-text-3">Lead: {c.lead ?? c.moderators[0]} · {c.projects.length} projects</p>
-                </div>
-                <Button size="sm" variant="ghost" onClick={() => toast('Club profile editor opens (demo)')}>
-                  Manage
-                </Button>
-              </Card>
-            ))}
-        </section>
-      )}
-
-      {tab === 'Resources' && (
-        <section className="space-y-3">
-          {pendingResources.length === 0 && <EmptyState icon={Check} title="No resources pending" />}
-          {pendingResources.map((r) => (
-            <Card key={r.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold">{r.title}</p>
-                <p className="text-xs text-text-3">
-                  {r.kind} · {r.subject} · Sem {r.semester}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button size="sm" onClick={() => act(r.id, 'Approved')}>
-                  Approve
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => act(r.id, 'Rejected')}>
-                  Reject
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </section>
-      )}
-    </div>
+    <Suspense fallback={<SkeletonList variant="card" count={3} />}>
+      <ContentInner />
+    </Suspense>
   );
 }

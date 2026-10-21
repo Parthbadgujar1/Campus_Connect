@@ -22,14 +22,12 @@ export const TABS: TabItem[] = [
 // Every screen belongs to one tab, so the right tab stays highlighted.
 const SECTION_PREFIXES: Record<Exclude<Section, 'home'>, string[]> = {
   campus: [
-    '/campus', '/study', '/resources', '/contributions', '/lectures', '/events', '/news', '/lost-found', '/help',
-    '/feedback', '/safety', '/opportunities', '/jobs', '/teams', '/placements', '/achievements', '/mentorship',
-    '/housing', '/marketplace', '/services', '/offers', '/travel', '/finance', '/business', '/academics', '/id',
-    '/opportunities',
+    '/campus', '/study', '/resources', '/contributions', '/lectures', '/events', '/news', '/lost-found',
+    '/feedback', '/surveys', '/safety', '/opportunities', '/jobs', '/teams', '/placements', '/mentorship',
+    '/housing', '/marketplace', '/services', '/id',
   ],
   discover: [
-    '/discover', '/spaces', '/loops', '/hush', '/games', '/trending', '/creators', '/network', '/memes', '/connect',
-    '/search', '/watch',
+    '/discover', '/spaces', '/loops', '/hush', '/games', '/trending', '/memes', '/connect', '/search',
   ],
   chats: ['/chats'],
   you: ['/you', '/settings', '/profile', '/verify', '/admin', '/login'],
@@ -47,4 +45,4 @@ export function sectionFor(pathname: string): Section {
 }
 
 /** Routes that take over the whole screen on a phone (no tab bar). */
-export const FULLSCREEN_PATTERN = /^\/(chats\/[^/]+|watch\/(v|party)\/[^/]+|loops|spaces\/[^/]+\/c\/[^/]+)$/;
+export const FULLSCREEN_PATTERN = /^\/(chats\/[^/]+|loops)$/;

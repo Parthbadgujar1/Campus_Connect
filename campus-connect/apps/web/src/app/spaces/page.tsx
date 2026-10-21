@@ -1,127 +1,115 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { MessageSquare, Plus } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { LayoutGrid, Lock, Plus, Search, Users } from 'lucide-react';
+import { get, post, withQuery } from '@/lib/api/client';
+import { invalidate, useAction, useInfinite, type Page } from '@/lib/api/hooks';
+import type { SpaceView } from '@/lib/api/types';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Chip, ChipRow } from '@/components/ui/chip';
-import { PageHeader, SectionHeader } from '@/components/ui/layout';
-import { Vote } from '@/components/spaces/vote';
-import { getPerson } from '@/data/people';
-import { spaces, threads, type Thread } from '@/data/spaces';
-import { appActions, useAppState } from '@/lib/store';
-import { NOW, relativeTime } from '@/lib/time';
-import { cn } from '@/lib/utils';
+import { Chip, ChipRow, Segmented } from '@/components/ui/chip';
+import { Field, Input, Select, Textarea } from '@/components/ui/fields';
+import { PageHeader } from '@/components/ui/layout';
+import { InfiniteList } from '@/components/ui/infinite';
+import { Sheet } from '@/components/ui/sheet';
+import { FormAlert, SkeletonList, Spinner } from '@/components/ui/states';
+import { useToast } from '@/components/ui/toast';
+import { Pressable, Reveal } from '@/components/motion';
+import { useSession } from '@/lib/session';
+import { gradientFor } from '@/lib/visuals';
+import { SPACE_KINDS, isStaffRole } from '@/components/spaces/space-kinds';
 
-type Sort = 'Hot' | 'New' | 'Top';
-const SORTS: Sort[] = ['Hot', 'New', 'Top'];
-
-// Boards: the reddit-style feed across every space you follow.
-export default function BoardsPage() {
-  const joined = useAppState((s) => s.joined);
-  const votes = useAppState((s) => s.votes);
-  const [sort, setSort] = useState<Sort>('Hot');
-  const [scope, setScope] = useState<'Following' | 'Everywhere'>('Following');
-
-  const feed = useMemo(() => {
-    const list = threads.filter((t) => scope === 'Everywhere' || joined.includes(spaces.find((s) => s.slug === t.spaceSlug)?.id ?? ''));
-    const age = (t: Thread) => Math.max(1, (NOW.getTime() - new Date(t.createdAt).getTime()) / 3_600_000);
-    const score = (t: Thread) => t.score + (votes[t.id] ?? 0);
-    return [...list].sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      if (sort === 'New') return b.createdAt.localeCompare(a.createdAt);
-      if (sort === 'Top') return score(b) - score(a);
-      return score(b) / Math.pow(age(b) + 2, 1.2) - score(a) / Math.pow(age(a) + 2, 1.2);
-    });
-  }, [joined, scope, sort, votes]);
-
+function SpaceCard({ s }: { s: SpaceView }) {
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-36 md:px-8 md:pb-16">
-      <PageHeader
-        title="Boards"
-        subtitle="Threads, votes and replies from your spaces"
-        back
-        backHref="/discover"
-        actions={
-          <Link href="/spaces/new" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-accent px-3.5 text-[14px] font-semibold text-accent-ink">
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Space
-          </Link>
-        }
-      />
+    <Pressable>
+      <Link href={`/spaces/${s.slug}`} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 shadow-card transition-colors hover:border-accent/40">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-[18px] font-bold text-white" style={{ background: gradientFor(s.slug) }}>{s.name.slice(0, 1)}</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5 font-semibold">
+            <span className="truncate">{s.name}</span>
+            {s.privacy === 'private' && <Lock className="h-3.5 w-3.5 shrink-0 text-text-3" aria-label="Private" />}
+          </span>
+          <span className="line-clamp-1 block text-[13px] text-text-3">{s.description || SPACE_KINDS[s.kind]}</span>
+          <span className="mt-1 flex items-center gap-2 text-[12px] text-text-3">
+            <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" aria-hidden="true" />{s.membersCount}</span>
+            <span>{SPACE_KINDS[s.kind] ?? s.kind}</span>
+            {s.membership?.status === 'active' && <Badge tone="success">Joined</Badge>}
+            {s.membership?.status === 'pending' && <Badge tone="warning">Requested</Badge>}
+          </span>
+        </span>
+      </Link>
+    </Pressable>
+  );
+}
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <ChipRow className="md:flex-nowrap">
-          {SORTS.map((item) => (
-            <Chip key={item} active={sort === item} onClick={() => setSort(item)}>
-              {item}
-            </Chip>
-          ))}
-        </ChipRow>
-        <div className="ml-auto flex rounded-full bg-surface-2 p-1 text-[14px] font-semibold" role="group" aria-label="Scope">
-          {(['Following', 'Everywhere'] as const).map((item) => (
-            <button key={item} type="button" aria-pressed={scope === item} onClick={() => setScope(item)} className={cn('h-8 rounded-full px-3', scope === item ? 'bg-surface text-text shadow-card' : 'text-text-2')}>
-              {item}
-            </button>
-          ))}
+function CreateSpace({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const toast = useToast();
+  const router = useRouter();
+  const { user } = useSession();
+  const [form, setForm] = useState({ name: '', kind: 'club', privacy: 'public', description: '' });
+  const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const send = useAction(async () => {
+    const r = await post<{ id: string; slug: string; status: string; message: string }>('/spaces', { name: form.name.trim(), kind: form.kind, privacy: form.privacy, description: form.description.trim() || undefined, tags: [] });
+    toast(r.message);
+    invalidate('spaces:');
+    onClose();
+    router.push(`/spaces/${r.slug}`);
+  });
+  const kinds = Object.entries(SPACE_KINDS).filter(([k]) => !['department', 'class'].includes(k) || isStaffRole(user?.role));
+  return (
+    <Sheet open={open} onClose={onClose} title="Start a space" description="A club, an interest or a study group. New spaces are checked before they are listed." footer={<Button full onClick={() => void send.run()} disabled={form.name.trim().length < 2 || send.pending}>{send.pending ? <Spinner /> : <Plus className="h-4 w-4" aria-hidden="true" />} Create space</Button>}>
+      <div className="space-y-4">
+        <Field label="Name" htmlFor="sp-name"><Input id="sp-name" value={form.name} onChange={(e) => set('name', e.target.value)} maxLength={80} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Type" htmlFor="sp-kind"><Select id="sp-kind" value={form.kind} onChange={(e) => set('kind', e.target.value)}>{kinds.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></Field>
+          <Field label="Who can join" htmlFor="sp-priv"><Select id="sp-priv" value={form.privacy} onChange={(e) => set('privacy', e.target.value)}><option value="public">Anyone at college</option><option value="private">By approval</option></Select></Field>
         </div>
+        <Field label="What is it about?" htmlFor="sp-desc"><Textarea id="sp-desc" value={form.description} onChange={(e) => set('description', e.target.value)} maxLength={600} rows={3} /></Field>
+        {send.error && <FormAlert>{send.error.message}</FormAlert>}
       </div>
+    </Sheet>
+  );
+}
 
-      <ul className="mt-5 space-y-3">
-        {feed.map((thread) => {
-          const space = spaces.find((s) => s.slug === thread.spaceSlug);
-          const author = thread.authorId === 'me' ? 'You' : getPerson(thread.authorId).name.split(' ')[0];
-          return (
-            <li key={thread.id} className="flex gap-3 rounded-2xl border border-border bg-surface p-4">
-              <Vote id={thread.id} base={thread.score} />
-              <Link href={`/spaces/${thread.spaceSlug}/t/${thread.id}`} className="min-w-0 flex-1">
-                <span className="flex flex-wrap items-center gap-2 text-[13px] text-text-3">
-                  <span className="font-semibold text-text-2">{space?.name}</span>
-                  <span className="rounded-full bg-surface-2 px-2 py-px text-[12px] font-semibold text-text-2">{thread.flair}</span>
-                  <span>
-                    {author} · {relativeTime(thread.createdAt)}
-                  </span>
-                </span>
-                <span className="mt-1.5 block text-[17px] font-semibold leading-snug">{thread.title}</span>
-                <span className="mt-1 line-clamp-2 block text-[14px] text-text-2">{thread.body}</span>
-                <span className="mt-2.5 inline-flex items-center gap-1.5 text-[13px] font-semibold text-text-3">
-                  <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
-                  {thread.comments} replies
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-        {feed.length === 0 && (
-          <li className="rounded-2xl border border-dashed border-border px-6 py-12 text-center">
-            <p className="text-[15px] font-semibold">No threads from your spaces yet</p>
-            <p className="mt-1 text-[14px] text-text-3">Join a space to see its threads here.</p>
-          </li>
-        )}
-      </ul>
-
-      <section className="mt-10" aria-labelledby="browse-spaces">
-        <SectionHeader title="Spaces to join" description="Clubs, classes and interests" />
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {spaces
-            .filter((s) => !joined.includes(s.id))
-            .slice(0, 6)
-            .map((space) => (
-              <li key={space.id} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4">
-                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-accent-soft text-[15px] font-bold text-accent-soft-ink">{space.name.slice(0, 2).toUpperCase()}</span>
-                <Link href={`/spaces/${space.slug}`} className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-semibold">{space.name}</span>
-                  <span className="block truncate text-[13px] text-text-3">
-                    {space.kind} · {space.members.toLocaleString('en-IN')} members
-                  </span>
-                </Link>
-                <Button size="sm" variant="secondary" onClick={() => appActions.toggleJoined(space.id)}>
-                  Join
-                </Button>
-              </li>
-            ))}
-        </ul>
-      </section>
+function SpacesInner() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const kind = params.get('kind');
+  const mine = params.get('mine') === 'true';
+  const q = params.get('q') ?? '';
+  const [search, setSearch] = useState(q);
+  const [creating, setCreating] = useState(false);
+  const go = (next: Record<string, string | null>) => router.push(withQuery(pathname, { kind, mine: mine ? 'true' : null, q: q || null, ...next }), { scroll: false });
+  const list = useInfinite<SpaceView>(`spaces:list:${kind}:${mine}:${q}`, (cursor, signal) => get<Page<SpaceView>>('/spaces', { kind: kind ?? undefined, mine: mine ? 'true' : undefined, q: q || undefined, cursor: cursor ?? undefined, limit: 20 }, signal));
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 pb-28 md:px-8 md:pb-12">
+      <PageHeader title="Boards" subtitle="Spaces for clubs, interests and study groups" back backHref="/discover" actions={<Button size="sm" onClick={() => setCreating(true)}><Plus className="h-4 w-4" aria-hidden="true" /> New space</Button>} />
+      <Reveal className="space-y-3">
+        <Segmented label="Spaces" value={mine ? 'mine' : 'all'} onChange={(v) => go({ mine: v === 'mine' ? 'true' : null })} options={[{ value: 'all', label: 'All spaces' }, { value: 'mine', label: 'My spaces' }]} />
+        <form className="relative" onSubmit={(e) => { e.preventDefault(); go({ q: search.trim() || null }); }}>
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-text-3" aria-hidden="true" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search spaces" className="pl-10" aria-label="Search spaces" enterKeyHint="search" />
+        </form>
+        <ChipRow>
+          <Chip active={!kind} onClick={() => go({ kind: null })}>All</Chip>
+          {Object.entries(SPACE_KINDS).map(([v, l]) => <Chip key={v} active={kind === v} onClick={() => go({ kind: v })}>{l}</Chip>)}
+        </ChipRow>
+      </Reveal>
+      <div className="mt-4">
+        <InfiniteList state={list} skeleton="row" className="space-y-3" empty={{ icon: LayoutGrid, title: mine ? 'You have not joined a space yet' : 'No spaces here', description: 'Start one for your club, interest or study group.' }} endMessage="That’s every space" render={(s) => <SpaceCard s={s} />} />
+      </div>
+      <CreateSpace open={creating} onClose={() => setCreating(false)} />
     </div>
+  );
+}
+
+export default function SpacesPage() {
+  return (
+    <Suspense fallback={<SkeletonList variant="row" count={4} className="mx-auto mt-24 max-w-3xl px-4" />}>
+      <SpacesInner />
+    </Suspense>
   );
 }

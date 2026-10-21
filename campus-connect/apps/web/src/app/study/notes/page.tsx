@@ -6,7 +6,7 @@ import { Button, IconButton } from '@/components/ui/button';
 import { Chip, ChipRow } from '@/components/ui/chip';
 import { EmptyState, PageHeader } from '@/components/ui/layout';
 import { useToast } from '@/components/ui/toast';
-import type { Note } from '@/data/study';
+import type { Note } from '@/lib/study';
 import { appActions, useAppState } from '@/lib/store';
 import { relativeTime } from '@/lib/time';
 import { hueFor } from '@/lib/visuals';

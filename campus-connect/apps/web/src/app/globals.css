@@ -1,16 +1,15 @@
 @import "tailwindcss";
 
-/* `dark:` follows the app's own ambience (Night and Dusk are dark), not the OS setting. */
+/* `dark:` follows the app's own ambience (Night is dark), not the OS setting. */
 @custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *));
 
 /* ══════════════════════════════════════════════════════════════════════════
    CampusConnect brand
    Light (Day): Blue #2563EB for actions and links, Violet #8B5CF6 for highlights,
-   white page, #F8FAFC cards, Slate #0F172A text. Night and Dusk keep Deep Blueberry
+   white page, #F8FAFC cards, Slate #0F172A text. Night keeps Deep Blueberry
    #302675 and Soda Green #B8F28B.
-   Fonts: Caveat Brush for titles and highlight labels, Caveat for body text,
-   Inter for navigation, buttons and forms.
-   Four ambiences set on <html data-theme>: day, night, paper, dusk.
+   Font: Kalam everywhere (titles, highlight labels, body text, buttons and forms).
+   Three ambiences set on <html data-theme>: day, night, paper.
    ══════════════════════════════════════════════════════════════════════════ */
 
 :root,
@@ -140,47 +139,6 @@
   --hl-green: #D2E8CF;
 }
 
-[data-theme="dusk"] {
-  --bg: #171329;
-  --surface: #211b3a;
-  --surface-solid: #211b3a;
-  --surface-2: #2a2448;
-  --surface-3: #352e58;
-  --border: #382f5c;
-  --text: #f3e8d8;
-  --text-2: #cfc3b0;
-  --text-3: #9c917e;
-  --accent: #f2c27b;
-  --accent-ink: #1a130e;
-  --accent-soft: rgb(242 194 123 / 0.15);
-  --accent-soft-ink: #f6d6a4;
-  --mark: #cfc6ff;
-  --mark-soft: rgb(160 150 255 / 0.18);
-  --highlight: #b8f28b;
-  --highlight-ink: #13112a;
-  --success: #bccb8e;
-  --success-soft: rgb(188 203 142 / 0.14);
-  --warning: #efc278;
-  --warning-soft: rgb(239 194 120 / 0.14);
-  --danger: #ef9c87;
-  --danger-soft: rgb(239 156 135 / 0.14);
-  --info: #cdb89e;
-  --info-soft: rgb(205 184 158 / 0.14);
-  --glass: #211b3a;
-  --glass-border: #382f5c;
-  --glass-shadow: 0 12px 32px -10px rgb(0 0 0 / 0.65);
-  --shadow-card: none;
-  --orb-a: #f2c27b;
-  --orb-b: #f2c27b;
-  --aura-opacity: 0;
-  color-scheme: dark;
-  --accent-hover: #f2c27b;
-  --hl-violet: rgb(196 181 253 / 0.32);
-  --hl-blue: rgb(147 197 253 / 0.32);
-  --hl-yellow: rgb(252 211 77 / 0.32);
-  --hl-pink: rgb(249 168 212 / 0.32);
-  --hl-green: rgb(134 239 172 / 0.3);
-}
 
 /* Daylight: chat backgrounds follow the time of day a message was sent. */
 :root,
@@ -201,12 +159,6 @@
   --day-afternoon: #efe9da;
   --day-evening: #ece2d2;
   --day-night: #e3dac8;
-}
-[data-theme="dusk"] {
-  --day-morning: #241c3a;
-  --day-afternoon: #1f1934;
-  --day-evening: #251c36;
-  --day-night: #171329;
 }
 
 @theme inline {
@@ -239,9 +191,10 @@
   --color-glass: var(--glass);
   --shadow-card: var(--shadow-card);
   --shadow-float: var(--glass-shadow);
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-caveat-brush), "Segoe Print", cursive, ui-sans-serif, system-ui, sans-serif;
-  --font-read: var(--font-caveat), "Segoe Print", cursive, ui-sans-serif, system-ui, sans-serif;
+  /* One level of indirection, so <html data-font> can swap every family at runtime (see below). */
+  --font-sans: var(--ff-ui);
+  --font-display: var(--ff-display);
+  --font-read: var(--ff-read);
   --font-mono: ui-monospace, "Cascadia Code", "SF Mono", monospace;
 }
 
@@ -263,6 +216,43 @@
   --animate-grow-x: grow-x 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
+/* Font choice (Settings > Appearance). The CampusConnect look is Kalam for everything; the
+   other two are accessibility choices a person can pick for themselves. */
+:root,
+:root[data-font="handwritten"] {
+  --ff-ui: var(--font-kalam), "Segoe Print", cursive, ui-sans-serif, system-ui, sans-serif;
+  --ff-display: var(--ff-ui);
+  --ff-read: var(--ff-ui);
+  --fsa-read: none;
+  --fsa-display: none;
+}
+/* System: the device's own font (San Francisco, Segoe UI, Roboto...). */
+:root[data-font="system"] {
+  --ff-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --ff-display: var(--ff-ui);
+  --ff-read: var(--ff-ui);
+  --fsa-read: none;
+  --fsa-display: none;
+}
+/* Easy to read: Atkinson Hyperlegible, designed for low vision and dyslexia. */
+:root[data-font="readable"] {
+  --ff-ui: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  --ff-display: var(--ff-ui);
+  --ff-read: var(--ff-ui);
+  --fsa-read: none;
+  --fsa-display: none;
+}
+/* In the base layer, so component classes (font-semibold...) still win. */
+@layer base {
+  :root:is([data-font="system"], [data-font="readable"]) :is(h1, h2, h3, h4, h5, h6, .font-display) {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  :root:is([data-font="system"], [data-font="readable"]) body {
+    font-synthesis-weight: auto;
+  }
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -273,7 +263,7 @@
     font-family: var(--font-read);
     font-weight: 400;
     font-synthesis-weight: none;
-    font-size-adjust: 0.53;
+    font-size-adjust: var(--fsa-read);
     color: var(--text);
     background: transparent;
     overflow-x: hidden;
@@ -313,7 +303,7 @@
   h5,
   h6,
   .font-display {
-    font-size-adjust: 0.47;
+    font-size-adjust: var(--fsa-display);
   }
   [data-theme="paper"] body {
     font-size: 1.04rem;
@@ -505,7 +495,7 @@
   color: var(--danger);
 }
 
-/* 3D flip for flashcards and the memory game. */
+/* 3D card flip for the memory game. */
 .flip-scene { perspective: 1200px; }
 .flip-card {
   transform-style: preserve-3d;
@@ -569,9 +559,52 @@
     --hl: var(--hl-green);
   }
 
-  /* Highlight labels: Caveat Brush on a soft, slightly uneven marker stroke. */
+  /* Highlight labels: Kalam on a soft, slightly uneven marker stroke. */
   .hand-label {
     font-family: var(--font-display);
     border-radius: 1.1em 0.7em 1em 0.6em / 0.7em 1em 0.6em 1.1em;
+  }
+}
+
+/* Print: clean black-on-white pages (legal pages, event details, notes). Navigation, floating
+   buttons and banners are hidden with print:hidden; links in policies show their address. */
+@media print {
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-solid: #ffffff;
+    --text: #000000;
+    --text-2: #222222;
+    --text-3: #444444;
+    --border: #cccccc;
+  }
+  html,
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .aura,
+  nav[aria-label="Primary"],
+  aside,
+  [role="region"][aria-label="Cookie choices"] {
+    display: none !important;
+  }
+  .app-zoom {
+    padding-left: 0 !important;
+  }
+  article,
+  section,
+  .rounded-2xl {
+    break-inside: avoid;
+    box-shadow: none !important;
+  }
+  .legal a[href^="http"]::after,
+  .legal a[href^="mailto:"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+  }
+  * {
+    animation: none !important;
+    transition: none !important;
   }
 }

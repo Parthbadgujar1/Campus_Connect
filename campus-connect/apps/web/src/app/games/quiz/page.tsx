@@ -5,17 +5,19 @@ import { useEffect, useState } from 'react';
 import { Trophy, RotateCcw } from 'lucide-react';
 import { Button, buttonClass } from '@/components/ui/button';
 import { Card, PageHeader, ProgressBar } from '@/components/ui/layout';
-import { quizQuestions } from '@/data/fun';
+import { pickQuestions, type QuizQuestion } from '@/lib/quiz-bank';
 import { cn } from '@/lib/utils';
 
 const SECONDS = 15;
 
 export default function QuizPage() {
+  const [quizQuestions, setQuestions] = useState<QuizQuestion[]>([]);
+  useEffect(() => setQuestions(pickQuestions()), []);
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(SECONDS);
-  const finished = index >= quizQuestions.length;
+  const finished = quizQuestions.length > 0 && index >= quizQuestions.length;
   const question = quizQuestions[index];
   const timedOut = selected === null && timeLeft === 0;
   const reveal = selected !== null || timedOut;
@@ -41,6 +43,7 @@ export default function QuizPage() {
   };
 
   const restart = () => {
+    setQuestions(pickQuestions());
     setIndex(0);
     setSelected(null);
     setScore(0);
@@ -49,7 +52,7 @@ export default function QuizPage() {
 
   return (
     <div className="mx-auto w-full max-w-xl px-4 pb-28 md:px-8 md:pb-12">
-      <PageHeader title="Campus trivia" back backHref="/games" />
+      <PageHeader title="Tech trivia" back backHref="/games" />
 
       {finished ? (
         <Card className="mt-6 flex flex-col items-center gap-4 p-8 text-center">

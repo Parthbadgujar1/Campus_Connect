@@ -9,7 +9,7 @@ export default function ChatsIndexPage() {
       </span>
       <p className="font-display text-2xl font-semibold">Pick a conversation</p>
       <p className="max-w-xs text-sm text-text-3">
-        Friends, study groups, class chats, spaces and anonymous rooms, all in calm lanes instead of bubbles.
+        Choose a chat on the left, or start a new one with a classmate or a group.
       </p>
     </div>
   );

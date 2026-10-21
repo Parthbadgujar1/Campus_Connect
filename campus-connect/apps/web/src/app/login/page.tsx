@@ -1,128 +1,142 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useState } from 'react';
-import { GraduationCap, Handshake, Shield, UserRound, type LucideIcon } from 'lucide-react';
-import { college, getPerson, me } from '@/data/people';
-import { mentors } from '@/data/careers';
-import { appActions, useAppState, type Session } from '@/lib/store';
-import type { Role } from '@/lib/types';
-import { cn } from '@/lib/utils';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { AuthLayout, Checkbox, FormField } from '@/components/auth/auth-layout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/fields';
+import { PasswordInput } from '@/components/ui/password-input';
+import { FormAlert, Spinner } from '@/components/ui/states';
+import { isApiError, post } from '@/lib/api/client';
+import { useSession } from '@/lib/session';
 
-interface Option {
-  role: Role;
-  title: string;
-  description: string;
-  icon: LucideIcon;
-  name: string;
-  email: string;
+/** Only same-site paths are followed after sign-in (no open redirects). */
+function safeNext(next: string | null): string {
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.startsWith('/\\')) return '/';
+  return next;
 }
 
-const expert = getPerson(mentors[0]?.personId ?? 'p-harsh');
-const faculty = getPerson('f-anita');
-
-const OPTIONS: Option[] = [
-  {
-    role: 'student',
-    title: 'Student',
-    description: 'Campus, spaces, chats, study circles and your profile.',
-    icon: UserRound,
-    name: me.name,
-    email: `${me.username}@${college.domain}`,
-  },
-  {
-    role: 'faculty',
-    title: 'Teacher',
-    description: 'Upload lectures, answer questions and review shared notes.',
-    icon: GraduationCap,
-    name: faculty.name,
-    email: `${faculty.username}@${college.domain}`,
-  },
-  {
-    role: 'expert',
-    title: 'Industry expert',
-    description: 'Mentor students, post opportunities and answer questions.',
-    icon: Handshake,
-    name: expert.name,
-    email: `${expert.username}@partners.${college.domain}`,
-  },
-  {
-    role: 'admin',
-    title: 'Admin',
-    description: 'Approve content, handle reports and send notices.',
-    icon: Shield,
-    name: 'Campus office',
-    email: `office@${college.domain}`,
-  },
-];
-
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
-  const signedIn = useAppState((s) => s.session);
-  const [choice, setChoice] = useState<Role>('student');
-  const selected = OPTIONS.find((o) => o.role === choice) ?? OPTIONS[0]!;
+  const params = useSearchParams();
+  const { signIn } = useSession();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [remember, setRemember] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<{ message: string; code?: string; fields?: Record<string, string> } | null>(null);
+  const [resent, setResent] = useState(false);
 
-  const enter = (option: Option) => {
-    const session: Session = { role: option.role, name: option.name, email: option.email };
-    appActions.signIn(session);
-    router.replace('/');
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    setResent(false);
+    try {
+      await signIn(email.trim(), password, remember);
+      router.replace(safeNext(params.get('next')));
+    } catch (err) {
+      if (isApiError(err)) setError({ message: err.message, code: err.code, fields: err.fields });
+      else setError({ message: 'Something went wrong. Please try again.' });
+      setPending(false);
+    }
+  };
+
+  const resend = async () => {
+    try {
+      await post('/auth/resend-verification', { email: email.trim() });
+      setResent(true);
+    } catch (err) {
+      setError({ message: isApiError(err) ? err.message : 'Could not send the email. Try again shortly.' });
+    }
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-5 py-10">
-      <p className="text-[14px] font-semibold text-accent">CampusConnect</p>
-      <h1 className="marker-heading hl-blue mt-2 text-[30px] font-bold leading-tight tracking-tight">Sign in to {college.shortName}</h1>
-      <p className="mt-2 text-[15px] text-text-2">Use your college email. Choose how you're joining today.</p>
-
-      <div role="radiogroup" aria-label="Who are you?" className="mt-7 grid gap-2.5">
-        {OPTIONS.map((option) => {
-          const active = option.role === choice;
-          const Icon = option.icon;
-          return (
-            <button
-              key={option.role}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => setChoice(option.role)}
-              className={cn(
-                'flex items-start gap-3.5 rounded-2xl border bg-surface p-4 text-left transition-colors',
-                active ? 'border-accent ring-2 ring-accent/20' : 'border-border hover:border-text-3',
-              )}
-            >
-              <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', active ? 'bg-accent text-accent-ink' : 'bg-surface-2 text-text-2')}>
-                <Icon className="h-5 w-5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[16px] font-semibold">{option.title}</span>
-                <span className="block text-[14px] text-text-3">{option.description}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-border bg-surface p-4">
-        <p className="text-[13px] font-semibold text-text-3">Signing in as</p>
-        <p className="mt-1 text-[15px] font-semibold">{selected.name}</p>
-        <p className="text-[14px] text-text-2">{selected.email}</p>
-      </div>
-
-      <button
-        type="button"
-        onClick={() => enter(selected)}
-        className="mt-5 h-12 rounded-full bg-accent text-[15px] font-semibold text-accent-ink transition-opacity hover:opacity-90"
-      >
-        Continue as {selected.title.toLowerCase()}
-      </button>
-      <p className="mt-4 text-center text-[13px] text-text-3">
-        Demo sign-in. Real accounts with college email verification arrive with the backend.
-      </p>
-      {signedIn && (
-        <button type="button" onClick={() => router.replace('/')} className="mt-2 text-center text-[14px] font-semibold text-accent">
-          Back to the app
-        </button>
+    <form onSubmit={submit} noValidate className="space-y-4" aria-describedby={error ? 'login-error' : undefined}>
+      {params.get('reason') === 'expired' && !error && <FormAlert tone="info">Your session ended. Please sign in again.</FormAlert>}
+      {params.get('reason') === 'deleted' && !error && (
+        <FormAlert tone="info">Your account is scheduled for deletion in 30 days and you have been signed out everywhere. Changed your mind? Sign in and choose “Keep my account”.</FormAlert>
       )}
-    </main>
+      {error && (
+        <div id="login-error">
+          <FormAlert>
+            <p>{error.message}</p>
+            {error.code === 'EMAIL_NOT_VERIFIED' && !resent && (
+              <button type="button" onClick={resend} className="mt-1 font-semibold underline">
+                Send the verification email again
+              </button>
+            )}
+            {error.code === 'ACCOUNT_SUSPENDED' && (
+              <Link href="/contact?topic=support" className="mt-1 inline-block font-semibold underline">
+                Contact support
+              </Link>
+            )}
+          </FormAlert>
+        </div>
+      )}
+      {resent && <FormAlert tone="success">Sent. Check your inbox (and spam) for the verification link.</FormAlert>}
+
+      <FormField id="email" label="Email" error={error?.fields?.email}>
+        <Input
+          id="email"
+          type="email"
+          inputMode="email"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          required
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          aria-invalid={Boolean(error?.fields?.email) || undefined}
+          aria-describedby={error?.fields?.email ? 'email-error' : undefined}
+        />
+      </FormField>
+      <FormField
+        id="password"
+        label="Password"
+        error={error?.fields?.password}
+        trailing={
+          <Link href={`/forgot-password${email ? `?email=${encodeURIComponent(email)}` : ''}`} className="font-sans text-[13px] font-semibold text-accent hover:underline">
+            Forgot password?
+          </Link>
+        }
+      >
+        <PasswordInput id="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} invalid={Boolean(error?.fields?.password)} />
+      </FormField>
+      <Checkbox id="remember" checked={remember} onChange={setRemember}>
+        Keep me signed in on this device <span className="text-text-3">(not on shared computers)</span>
+      </Checkbox>
+      <Button type="submit" full size="lg" disabled={pending || !email || !password} aria-busy={pending}>
+        {pending && <Spinner />}
+        {pending ? 'Signing in…' : 'Sign in'}
+      </Button>
+      {process.env.NODE_ENV !== 'production' && (
+        <p className="font-sans text-center text-[12px] text-text-3">Local testing: demo accounts for every role are listed at the top of apps/api/scripts/seed.ts.</p>
+      )}
+    </form>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Sign in with your email and password."
+      footer={
+        <>
+          New to CampusConnect?{' '}
+          <Link href="/register" className="font-semibold text-accent hover:underline">
+            Create an account
+          </Link>
+        </>
+      }
+    >
+      <Suspense fallback={<Spinner label="Loading" />}>
+        <LoginForm />
+      </Suspense>
+    </AuthLayout>
   );
 }

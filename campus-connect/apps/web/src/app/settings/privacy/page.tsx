@@ -1,132 +1,135 @@
 'use client';
 
-import Link from 'next/link';
-import { useState } from 'react';
-import { Ban, ShieldCheck, Flag } from 'lucide-react';
-import { Avatar } from '@/components/ui/avatar';
+import { Ban, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Segmented } from '@/components/ui/chip';
 import { Switch } from '@/components/ui/fields';
-import { Card, EmptyState, PageHeader, ProgressBar, SectionHeader } from '@/components/ui/layout';
+import { Card, EmptyState, PageHeader, SectionHeader } from '@/components/ui/layout';
+import { PersonAvatar } from '@/components/ui/person-avatar';
+import { ErrorState, SkeletonList } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
-import { getPerson } from '@/data/people';
-import { appActions, useAppState } from '@/lib/store';
+import { del, errorMessage, get, patch } from '@/lib/api/client';
+import { useQuery } from '@/lib/api/hooks';
+import type { Me, PersonSummary } from '@/lib/api/types';
+import { ago } from '@/lib/live-time';
+import { useSession } from '@/lib/session';
 
-type Audience = 'everyone' | 'connections' | 'nobody';
+type MessagePrivacy = Me['profile']['messagePrivacy'];
+type ProfileVisibility = 'campus' | 'connections';
 
-const REPORTS = [
-  { id: 'rp-own-1', target: 'Post on DBMS thread', reason: 'Spam', status: 'Reviewed', at: '2 days ago' },
-  { id: 'rp-own-2', target: 'Marketplace listing', reason: 'Fake listing', status: 'Action taken', at: '1 week ago' },
-];
-
-export default function PrivacyPage() {
+export default function PrivacyControlsPage() {
   const toast = useToast();
-  const blocked = useAppState((s) => s.blocked);
-  const [visibility, setVisibility] = useState<Record<string, boolean>>({
-    publicProfile: true,
-    showBranch: true,
-    showProjects: true,
-    showActivity: false,
-    showEmail: false,
-  });
-  const [messages, setMessages] = useState<Audience>('everyone');
+  const { user, refresh } = useSession();
+  const blocked = useQuery<{ items: PersonSummary[] }>('me:blocks', (s) => get('/me/blocks', undefined, s));
+  const reports = useQuery<{ items: Array<{ id: string; targetType: string; reason: string; status: string; outcome: string; createdAt: string }> }>('me:reports', (s) => get('/reports/mine', undefined, s));
 
-  const toggle = (key: string) => (checked: boolean) => setVisibility((s) => ({ ...s, [key]: checked }));
+  if (!user) return <SkeletonList className="mx-auto mt-8 max-w-2xl px-4" count={2} />;
+  const vis = { profile: 'campus' as ProfileVisibility, showBranch: true, showEmail: false, showActivity: false, ...user.profile.visibility };
+
+  const save = async (change: Record<string, unknown>) => {
+    try {
+      await patch('/me/profile', change);
+      await refresh();
+      toast('Saved');
+    } catch (err) {
+      toast(errorMessage(err));
+    }
+  };
+  const setVis = (key: keyof typeof vis, value: unknown) => void save({ visibility: { ...vis, [key]: value } });
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-28 md:px-8 md:pb-12">
       <PageHeader title="Privacy controls" back backHref="/settings" subtitle="Choose what others can see and do" />
 
-      <section className="mt-5">
-        <SectionHeader title="Profile visibility" />
-        <Card className="divide-y divide-border overflow-hidden">
-          <Switch label="Public profile" description="Anyone on campus can find your profile" checked={visibility.publicProfile} onChange={toggle('publicProfile')} />
-          <Switch label="Show branch and year" checked={visibility.showBranch} onChange={toggle('showBranch')} />
-          <Switch label="Show projects and certificates" checked={visibility.showProjects} onChange={toggle('showProjects')} />
-          <Switch label="Show activity status" description="Let people see when you were last active" checked={visibility.showActivity} onChange={toggle('showActivity')} />
-          <Switch label="Show email address" description="Only verified students can see it" checked={visibility.showEmail} onChange={toggle('showEmail')} />
-        </Card>
-      </section>
-
-      <section className="mt-6">
-        <SectionHeader title="Who can message you" description="Requests from others go to a separate inbox" />
-        <Card className="p-4">
-          <Segmented<Audience>
-            label="Who can message you"
-            value={messages}
-            onChange={(next) => {
-              setMessages(next);
-              toast('Messaging preference saved');
-            }}
-            options={[
-              { value: 'everyone', label: 'Everyone' },
-              { value: 'connections', label: 'Connections' },
-              { value: 'nobody', label: 'Nobody' },
-            ]}
-          />
-        </Card>
-      </section>
-
-      <section className="mt-6" aria-labelledby="blocked">
-        <div id="blocked" className="scroll-mt-20" />
-        <SectionHeader title="Blocked people" description="They can’t message you or see your posts" />
-        <Card className="overflow-hidden">
-          {blocked.length === 0 ? (
-            <EmptyState icon={Ban} title="No one is blocked" description="Use the block option on a profile or chat to add someone here." className="m-4" />
-          ) : (
-            <ul className="divide-y divide-border">
-              {blocked.map((id) => {
-                const person = getPerson(id);
-                return (
-                  <li key={id} className="flex items-center gap-3 px-4 py-3">
-                    <Avatar name={person.name} seed={person.id} size="sm" />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{person.name}</span>
-                    <Button size="sm" variant="secondary" onClick={() => appActions.toggleBlocked(id)}>
-                      Unblock
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-      </section>
-
-      <section className="mt-6">
-        <SectionHeader title="Your reports" description="Reports you filed. Identities of reporters are never shown to the reported person." />
-        <Card className="divide-y divide-border overflow-hidden">
-          {REPORTS.map((report) => (
-            <div key={report.id} className="flex items-start gap-3 px-4 py-3.5">
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-text-2">
-                <Flag className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{report.target}</p>
-                <p className="text-xs text-text-3">
-                  {report.reason} · {report.at}
-                </p>
-              </div>
-              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-text-2">{report.status}</span>
-            </div>
-          ))}
-        </Card>
-      </section>
-
-      <section className="mt-6">
-        <SectionHeader title="Trust score" description="Built from verification, reports and community feedback" />
-        <Card className="p-4">
-          <div className="flex items-center justify-between">
-            <p className="flex items-center gap-2 text-sm font-semibold">
-              <ShieldCheck className="h-4 w-4 text-success" aria-hidden="true" />
-              Trusted student
-            </p>
-            <p className="text-sm font-bold">86 / 100</p>
+      <section className="mt-5" aria-label="Your profile">
+        <SectionHeader title="Your profile" description="Only people at your college can ever see your profile." />
+        <Card className="space-y-4 p-4">
+          <div className="space-y-2">
+            <p className="font-sans text-sm font-semibold">Who can see your full profile</p>
+            <Segmented<ProfileVisibility>
+              label="Profile visibility"
+              value={vis.profile}
+              onChange={(v) => setVis('profile', v)}
+              options={[{ value: 'campus', label: 'Everyone at college' }, { value: 'connections', label: 'Mutual follows' }]}
+            />
           </div>
-          <ProgressBar value={86} tone="success" className="mt-3" label="Trust score" />
-          <p className="mt-3 text-xs text-text-3">
-            Verify more details in <Link href="/verify" className="font-semibold text-accent">College verification</Link> to raise it.
-          </p>
         </Card>
+        <Card className="mt-3 divide-y divide-border overflow-hidden">
+          <Switch label="Show department and year" description="On your profile and next to your name" checked={vis.showBranch} onChange={(v) => setVis('showBranch', v)} />
+          <Switch label="Show my email" description="Lets classmates email you directly" checked={vis.showEmail} onChange={(v) => setVis('showEmail', v)} />
+          <Switch label="Show my activity" description="Events you are going to and spaces you joined" checked={vis.showActivity} onChange={(v) => setVis('showActivity', v)} />
+        </Card>
+      </section>
+
+      <section className="mt-8" aria-label="Messages">
+        <SectionHeader title="Who can message you" />
+        <Card className="p-4">
+          <Segmented<MessagePrivacy>
+            label="Who can message you"
+            value={user.profile.messagePrivacy}
+            onChange={(v) => void save({ messagePrivacy: v })}
+            options={[{ value: 'everyone', label: 'Everyone' }, { value: 'connections', label: 'Mutual follows' }, { value: 'nobody', label: 'Nobody new' }]}
+          />
+          <p className="font-sans mt-3 text-[13px] text-text-3">Existing chats stay open. Blocked people can never message you.</p>
+        </Card>
+      </section>
+
+      <section id="blocked" className="mt-8 scroll-mt-20" aria-label="Blocked people">
+        <SectionHeader title="Blocked people" description="You do not see each other anywhere. They are not told." />
+        {blocked.loading ? (
+          <SkeletonList variant="row" count={2} />
+        ) : blocked.error ? (
+          <ErrorState error={blocked.error} onRetry={blocked.reload} />
+        ) : blocked.data!.items.length ? (
+          <Card className="divide-y divide-border overflow-hidden">
+            {blocked.data!.items.map((p) => (
+              <div key={p.id} className="flex items-center gap-3 px-4 py-3">
+                <PersonAvatar person={p} size="sm" />
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{p.displayName}</span>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      await del(`/users/${p.id}/block`);
+                      blocked.setData((cur) => ({ items: (cur?.items ?? []).filter((x) => x.id !== p.id) }));
+                      toast(`Unblocked ${p.displayName}`);
+                    } catch (err) {
+                      toast(errorMessage(err));
+                    }
+                  }}
+                >
+                  Unblock
+                </Button>
+              </div>
+            ))}
+          </Card>
+        ) : (
+          <EmptyState icon={Ban} title="You have not blocked anyone" />
+        )}
+      </section>
+
+      <section className="mt-8" aria-label="Your reports">
+        <SectionHeader title="Your reports" description="What happened to things you reported" />
+        {reports.loading ? (
+          <SkeletonList variant="row" count={2} />
+        ) : reports.error ? (
+          <ErrorState error={reports.error} onRetry={reports.reload} />
+        ) : reports.data!.items.length ? (
+          <Card className="divide-y divide-border overflow-hidden">
+            {reports.data!.items.map((r) => (
+              <div key={r.id} className="font-sans flex items-center gap-3 px-4 py-3">
+                <Flag className="h-4 w-4 shrink-0 text-text-3" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-semibold capitalize">{r.targetType.replace('_', ' ')} · {r.reason.replace('_', ' ')}</span>
+                  <span className="block text-[12px] text-text-3">{r.outcome} · {ago(r.createdAt)}</span>
+                </span>
+              </div>
+            ))}
+          </Card>
+        ) : (
+          <EmptyState icon={Flag} title="No reports" description="If something breaks the rules, use Report on it." />
+        )}
       </section>
     </div>
   );

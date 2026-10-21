@@ -1,125 +1,100 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { CalendarDays, Plus, Search } from 'lucide-react';
-import { EventCard } from '@/components/events/event-card';
+import { get, withQuery } from '@/lib/api/client';
+import { useInfinite, type Page } from '@/lib/api/hooks';
+import type { EventView } from '@/lib/api/types';
 import { Button } from '@/components/ui/button';
 import { Chip, ChipRow, Segmented } from '@/components/ui/chip';
 import { Input } from '@/components/ui/fields';
-import { EmptyState, PageHeader, SectionHeader } from '@/components/ui/layout';
-import { useToast } from '@/components/ui/toast';
-import { events, eventCategories } from '@/data/events';
-import { useAppState } from '@/lib/store';
-import { NOW, dayHeading, dayKey } from '@/lib/time';
+import { PageHeader } from '@/components/ui/layout';
+import { InfiniteList } from '@/components/ui/infinite';
+import { SkeletonList } from '@/components/ui/states';
+import { Reveal } from '@/components/motion';
+import { CATEGORY_LABEL, CreateEventSheet, EventCard } from '@/components/events/live-event';
+import { useSession } from '@/lib/session';
+import { can } from '@/lib/roles';
 
-type View = 'Upcoming' | 'Going' | 'Past';
+type When = 'upcoming' | 'mine' | 'organizing' | 'past';
 
-export default function EventsPage() {
-  const [view, setView] = useState<View>('Upcoming');
-  const [category, setCategory] = useState<string>('All');
-  const [query, setQuery] = useState('');
-  const rsvp = useAppState((s) => s.rsvp);
-  const toast = useToast();
-
-  const list = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const nowMs = NOW.getTime();
-    return events
-      .filter((e) => {
-        if (view === 'Past') return new Date(e.endsAt).getTime() < nowMs;
-        if (new Date(e.endsAt).getTime() < nowMs) return false;
-        return view === 'Upcoming' || rsvp[e.id] === 'going';
-      })
-      .filter((e) => category === 'All' || e.category === category)
-      .filter((e) => !q || e.title.toLowerCase().includes(q) || e.tags.some((t) => t.includes(q)))
-      .sort((a, b) => (view === 'Past' ? b.startsAt.localeCompare(a.startsAt) : a.startsAt.localeCompare(b.startsAt)));
-  }, [view, category, query, rsvp]);
-
-  // Group by calendar day so the list reads like an agenda.
-  const groups = list.reduce<Record<string, typeof list>>((acc, event) => {
-    const key = dayKey(event.startsAt);
-    (acc[key] ??= []).push(event);
-    return acc;
-  }, {});
+function EventsInner() {
+  const { user } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const when = (params.get('when') as When) || 'upcoming';
+  const category = params.get('category');
+  const q = params.get('q') ?? '';
+  const [search, setSearch] = useState(q);
+  const [creating, setCreating] = useState(params.get('create') === '1');
+  const go = (next: Record<string, string | null>) => router.push(withQuery(pathname, { when: when === 'upcoming' ? null : when, category, q: q || null, ...next }), { scroll: false });
+  const list = useInfinite<EventView>(`events:list:${when}:${category}:${q}`, (cursor, signal) => get<Page<EventView>>('/events', { when, category: category ?? undefined, q: q || undefined, cursor: cursor ?? undefined, limit: 12 }, signal));
 
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-36 md:px-8 md:pb-16">
+    <div className="mx-auto w-full max-w-4xl px-4 pb-28 md:px-8 md:pb-12">
       <PageHeader
         title="Events"
-        subtitle="Hackathons, workshops, fests and placement drives"
+        subtitle="Fests, workshops, talks and meetups"
         back
-        backHref="/"
+        backHref="/campus"
         actions={
-          <button
-            type="button"
-            aria-label="Suggest an event"
-            onClick={() => toast('Clubs and admins submit events for approval')}
-            className="press grid h-10 w-10 place-items-center rounded-full bg-accent text-accent-ink shadow-card"
-          >
-            <Plus className="h-5 w-5" aria-hidden="true" />
-          </button>
+          can(user, 'events.create') && (
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus className="h-4 w-4" aria-hidden="true" /> Create
+            </Button>
+          )
         }
       />
-
-      <div className="mt-4 space-y-4">
-        <Segmented<View>
-          label="Event views"
-          value={view}
-          onChange={setView}
+      <Reveal className="space-y-3">
+        <Segmented<When>
+          label="Which events"
+          value={when}
+          onChange={(v) => go({ when: v === 'upcoming' ? null : v })}
           options={[
-            { value: 'Upcoming', label: 'Upcoming' },
-            { value: 'Going', label: 'Going' },
-            { value: 'Past', label: 'Past' },
+            { value: 'upcoming', label: 'Upcoming' },
+            { value: 'mine', label: 'My RSVPs' },
+            { value: 'organizing', label: 'Organising' },
+            { value: 'past', label: 'Past' },
           ]}
         />
-
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-3" aria-hidden="true" />
-          <Input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search events or tags"
-            aria-label="Search events"
-            className="rounded-full pl-10"
-          />
-        </div>
-
+        <form
+          className="relative"
+          onSubmit={(e) => {
+            e.preventDefault();
+            go({ q: search.trim() || null });
+          }}
+        >
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-text-3" aria-hidden="true" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search events, venues or tags" className="pl-10" aria-label="Search events" enterKeyHint="search" />
+        </form>
         <ChipRow>
-          {['All', ...eventCategories].map((item) => (
-            <Chip key={item} active={category === item} onClick={() => setCategory(item)}>
-              {item}
-            </Chip>
+          <Chip active={!category} onClick={() => go({ category: null })}>All</Chip>
+          {Object.entries(CATEGORY_LABEL).map(([v, l]) => (
+            <Chip key={v} active={category === v} onClick={() => go({ category: v })}>{l}</Chip>
           ))}
         </ChipRow>
-      </div>
-
-      {list.length === 0 ? (
-        <EmptyState
-          icon={CalendarDays}
-          title={view === 'Going' ? 'You have no RSVPs yet' : 'No events match'}
-          description={view === 'Going' ? 'Tap Going on an event to add it to your agenda and your ID check-in.' : 'Try another category or search term.'}
-          className="mt-8"
-          action={
-            view === 'Going' ? (
-              <Button variant="soft" onClick={() => setView('Upcoming')}>
-                Browse upcoming events
-              </Button>
-            ) : undefined
-          }
+      </Reveal>
+      <div className="mt-4">
+        <InfiniteList
+          state={list}
+          skeleton="card"
+          className="grid gap-4 sm:grid-cols-2"
+          empty={{ icon: CalendarDays, title: when === 'mine' ? 'No RSVPs yet' : when === 'organizing' ? 'You have not organised an event' : 'No events here', description: when === 'upcoming' ? 'Nothing is scheduled for this filter yet.' : undefined, action: when === 'organizing' && can(user, 'events.create') ? <Button onClick={() => setCreating(true)}>Create an event</Button> : undefined }}
+          endMessage={when === 'past' ? 'That’s every past event' : 'That’s everything on the calendar'}
+          render={(e) => <EventCard e={e} />}
         />
-      ) : (
-        Object.entries(groups).map(([key, dayEvents]) => (
-          <section key={key} className="mt-6">
-            <SectionHeader title={dayHeading(dayEvents[0]!.startsAt)} description={`${dayEvents.length} event${dayEvents.length === 1 ? '' : 's'}`} />
-            <div className="stagger space-y-3">
-              {dayEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
-          </section>
-        ))
-      )}
+      </div>
+      <CreateEventSheet open={creating} onClose={() => setCreating(false)} />
     </div>
+  );
+}
+
+export default function EventsPage() {
+  return (
+    <Suspense fallback={<SkeletonList variant="card" count={4} className="mx-auto mt-24 max-w-4xl px-4" />}>
+      <EventsInner />
+    </Suspense>
   );
 }

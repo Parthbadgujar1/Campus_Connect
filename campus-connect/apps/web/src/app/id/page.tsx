@@ -1,191 +1,114 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { BookMarked, CalendarCheck, DoorOpen, ShieldCheck, Sun, Users } from 'lucide-react';
+import { BadgeCheck, CalendarCheck, ChevronRight, Ticket } from 'lucide-react';
+import { get } from '@/lib/api/client';
+import { useQuery, type Page } from '@/lib/api/hooks';
+import type { EventView } from '@/lib/api/types';
 import { Badge } from '@/components/ui/badge';
-import { Segmented } from '@/components/ui/chip';
-import { Card, EmptyState, PageHeader, SectionHeader } from '@/components/ui/layout';
+import { EmptyState, PageHeader, SectionHeader } from '@/components/ui/layout';
+import { SkeletonList } from '@/components/ui/states';
 import { QrCode } from '@/components/common/qr-code';
-import { communities } from '@/data/communities';
-import { events } from '@/data/events';
-import { college, me } from '@/data/people';
-import { attendance } from '@/data/learning';
-import { useAppState } from '@/lib/store';
-import { formatRange } from '@/lib/time';
+import { PersonAvatar } from '@/components/ui/person-avatar';
+import { Reveal } from '@/components/motion';
+import { useSession } from '@/lib/session';
+import { ROLE_LABEL } from '@/lib/roles';
+import { dateTime } from '@/lib/live-time';
 
-type Section = 'Access' | 'Library' | 'Clubs' | 'Check-in';
+// My campus card: who you are on CampusConnect, with a QR code that opens your profile (handy to
+// share your contact at a fest), and quick access to your event tickets. It is not an official
+// college ID card.
 
-const GATES = [
-  { id: 'g1', name: 'Main gate', status: 'Active' },
-  { id: 'g2', name: 'Hostel B entry', status: 'Active' },
-  { id: 'g3', name: 'Central library', status: 'Active' },
-  { id: 'g4', name: 'Innovation Lab (Block C)', status: 'Badge required' },
-  { id: 'g5', name: 'Electrical lab 1', status: 'Scheduled' },
-];
-
-const BORROWED = [
-  { id: 'b1', title: 'Operating System Concepts (Galvin)', due: '22 Oct 2026', overdue: false },
-  { id: 'b2', title: 'Database System Concepts', due: '10 Oct 2026', overdue: true },
-];
-
-export default function StudentIdPage() {
-  const [section, setSection] = useState<Section>('Access');
-  const joined = useAppState((s) => s.joined);
-  const rsvp = useAppState((s) => s.rsvp);
-  const attending = events.filter((e) => rsvp[e.id] === 'going');
-  const clubs = communities.filter((c) => joined.includes(c.id));
+export default function CampusCardPage() {
+  const { user } = useSession();
+  const tickets = useQuery<Page<EventView>>('events:list:mine:card', (signal) => get('/events', { when: 'mine', limit: 20 }, signal));
+  if (!user) return null;
+  const profileUrl = typeof window !== 'undefined' ? `${window.location.origin}/profile/${user.profile.username}` : `/profile/${user.profile.username}`;
+  const going = (tickets.data?.items ?? []).filter((e) => e.myRsvp === 'going' && e.status === 'published' && new Date(e.endsAt) > new Date());
+  const detail = user.role === 'student'
+    ? [user.profile.department, user.profile.year ? `Year ${user.profile.year}` : null, user.profile.division ? `Div ${user.profile.division}` : null].filter(Boolean).join(' · ')
+    : [user.roleInfo.designation, user.roleInfo.organization ?? user.profile.department].filter(Boolean).join(' · ');
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-28 md:px-8 md:pb-12">
-      <PageHeader title="Digital student ID" back backHref="/campus" subtitle="Use it at gates, labs, the library and events" />
-
-      <div
-        className="relative mt-4 overflow-hidden rounded-3xl p-5 text-white shadow-xl"
-        style={{ background: '#22377f' }}
-      >
-        <div className="relative flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-white/70">{college.shortName} · Student ID</p>
-            <p className="mt-1 text-lg font-bold leading-tight">{college.name}</p>
-          </div>
-          <Badge tone="success" className="bg-white/15 text-white">
-            <ShieldCheck className="h-3 w-3" aria-hidden="true" />
-            Verified
-          </Badge>
-        </div>
-
-        <div className="relative mt-6 flex items-end justify-between gap-4">
-          <div className="min-w-0 space-y-3">
-            <div>
-              <p className="text-2xl font-bold tracking-tight">{me.name}</p>
-              <p className="text-sm text-white/80">
-                {me.branch} · Year {me.year} · Div {me.division}
-              </p>
+      <PageHeader title="My campus card" back backHref="/you" subtitle="Your details and event tickets in one place" />
+      <Reveal>
+        <div className="relative mt-2 overflow-hidden rounded-3xl bg-[#22377f] p-5 text-white shadow-xl">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/70">{user.college.shortName} · CampusConnect</p>
+              <p className="mt-1 truncate text-[16px] font-bold leading-tight">{user.college.name}</p>
             </div>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
-              <div>
-                <dt className="text-white/60">Roll no.</dt>
-                <dd className="font-semibold tabular-nums">CSMSS-23-0142</dd>
-              </div>
-              <div>
-                <dt className="text-white/60">Valid till</dt>
-                <dd className="font-semibold">Jun 2027</dd>
-              </div>
-            </dl>
+            {user.profile.isVerified && (
+              <Badge className="bg-white/15 text-white" icon={<BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />}>
+                Verified
+              </Badge>
+            )}
           </div>
-          <div className="shrink-0">
-            <QrCode seed={`${me.id}-id`} size={116} label="Your student ID QR code" />
+          <div className="mt-6 flex items-end justify-between gap-4">
+            <div className="min-w-0 space-y-3">
+              <div className="flex items-center gap-3">
+                <PersonAvatar person={{ id: user.id, displayName: user.profile.displayName, avatarUrl: user.profile.avatarUrl, username: user.profile.username }} size="lg" className="ring-2 ring-white/40" />
+                <div className="min-w-0">
+                  <p className="truncate text-[22px] font-bold tracking-tight">{user.profile.displayName}</p>
+                  <p className="truncate text-sm text-white/80">@{user.profile.username}</p>
+                </div>
+              </div>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs">
+                <div>
+                  <dt className="text-white/60">Role</dt>
+                  <dd className="font-semibold">{ROLE_LABEL[user.role]}{user.pendingRole ? ` (${user.pendingRole} pending)` : ''}</dd>
+                </div>
+                {detail && (
+                  <div>
+                    <dt className="text-white/60">{user.role === 'student' ? 'Class' : 'Details'}</dt>
+                    <dd className="font-semibold">{detail}</dd>
+                  </div>
+                )}
+                {user.roleInfo.enrollmentNumber && (
+                  <div>
+                    <dt className="text-white/60">Enrolment no.</dt>
+                    <dd className="font-semibold tabular-nums">{user.roleInfo.enrollmentNumber}</dd>
+                  </div>
+                )}
+                {user.roleInfo.employeeId && (
+                  <div>
+                    <dt className="text-white/60">Employee ID</dt>
+                    <dd className="font-semibold tabular-nums">{user.roleInfo.employeeId}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+            <div className="shrink-0 text-center">
+              <QrCode value={profileUrl} size={112} label="QR code that opens your profile" />
+              <p className="mt-1 text-[10px] text-white/70">Scan to open profile</p>
+            </div>
           </div>
         </div>
-      </div>
+        <p className="mt-2 text-center text-[12px] text-text-3">This card is for CampusConnect only; it is not an official college ID.</p>
+      </Reveal>
 
-      <p className="mt-3 flex items-center gap-2 text-xs text-text-3">
-        <Sun className="h-3.5 w-3.5" aria-hidden="true" />
-        Turn brightness up when scanning at a gate or event desk.
-      </p>
-
-      <div className="mt-6">
-        <Segmented<Section>
-          label="ID sections"
-          value={section}
-          onChange={setSection}
-          options={[
-            { value: 'Access', label: 'Access' },
-            { value: 'Library', label: 'Library' },
-            { value: 'Clubs', label: 'Clubs' },
-            { value: 'Check-in', label: 'Check-in' },
-          ]}
-        />
-      </div>
-
-      <div className="mt-5">
-        {section === 'Access' && (
-          <Card className="divide-y divide-border">
-            {GATES.map((gate) => (
-              <div key={gate.id} className="flex items-center gap-3 px-4 py-3.5">
-                <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface-2 text-text-2">
-                  <DoorOpen className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <span className="flex-1 text-[15px] font-medium">{gate.name}</span>
-                <Badge tone={gate.status === 'Active' ? 'success' : 'neutral'}>{gate.status}</Badge>
-              </div>
-            ))}
-          </Card>
-        )}
-
-        {section === 'Library' && (
-          <div className="space-y-4">
-            <Card className="divide-y divide-border">
-              {BORROWED.map((book) => (
-                <div key={book.id} className="flex items-center gap-3 px-4 py-3.5">
-                  <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface-2 text-text-2">
-                    <BookMarked className="h-4 w-4" aria-hidden="true" />
+      <section className="mt-8" aria-label="Event tickets">
+        <SectionHeader title="Event tickets" description="Show the QR on the event page at the entrance" />
+        {tickets.loading && <SkeletonList variant="row" count={2} />}
+        {!tickets.loading && !going.length && <EmptyState icon={Ticket} title="No tickets yet" description="RSVP “Going” to an event and its ticket shows up here." action={<Link href="/events" className="font-semibold text-accent">Browse events</Link>} />}
+        {going.length > 0 && (
+          <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+            {going.map((e) => (
+              <li key={e.id}>
+                <Link href={`/events/${e.id}`} className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2">
+                  <CalendarCheck className="h-5 w-5 shrink-0 text-success" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{e.title}</span>
+                    <span className="block truncate text-[13px] text-text-3">{dateTime(e.startsAt)} · {e.venue}</span>
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[15px] font-medium">{book.title}</p>
-                    <p className={book.overdue ? 'text-xs font-semibold text-danger' : 'text-xs text-text-3'}>
-                      Due {book.due}
-                      {book.overdue ? ' · overdue' : ''}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </Card>
-            <p className="text-sm text-text-3">
-              Library hours: 8 AM – 10 PM (exam week). Digital library access is included with your ID.
-            </p>
-            <Link href="/resources" className="text-sm font-semibold text-accent hover:underline">
-              Open resource hub →
-            </Link>
-          </div>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-text-3" aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
-
-        {section === 'Clubs' && (
-          <div>
-            <SectionHeader title="Club memberships" description="Shown to club leads for event entry" />
-            {clubs.length === 0 ? (
-              <EmptyState icon={Users} title="No memberships yet" action={<Link href="/spaces" className="text-sm font-semibold text-accent">Browse spaces</Link>} />
-            ) : (
-              <Card className="divide-y divide-border">
-                {clubs.map((club) => (
-                  <Link key={club.id} href={`/spaces/${club.slug}`} className="flex items-center justify-between px-4 py-3.5 hover:bg-surface-2">
-                    <span className="text-[15px] font-medium">{club.name}</span>
-                    <Badge tone="accent">Member</Badge>
-                  </Link>
-                ))}
-              </Card>
-            )}
-          </div>
-        )}
-
-        {section === 'Check-in' && (
-          <div>
-            <SectionHeader title="Events you’re going to" description="Show the event code at the desk, or scan the QR" />
-            {attending.length === 0 ? (
-              <EmptyState icon={CalendarCheck} title="No RSVPs yet" description="Mark an event as Going and its check-in code appears here." action={<Link href="/events" className="text-sm font-semibold text-accent">Browse events</Link>} />
-            ) : (
-              <div className="space-y-3">
-                {attending.map((event) => (
-                  <Card key={event.id} className="flex items-center gap-4 p-4">
-                    <QrCode seed={event.checkInCode} size={84} label={`Check-in code for ${event.title}`} />
-                    <div className="min-w-0 flex-1">
-                      <p className="line-clamp-2 font-semibold leading-snug">{event.title}</p>
-                      <p className="mt-1 text-xs text-text-3">{formatRange(event.startsAt, event.endsAt)}</p>
-                      <p className="mt-2 font-mono text-sm font-semibold tracking-wider">{event.checkInCode}</p>
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <p className="mt-8 text-center text-xs text-text-3">
-        Attendance across {attendance.length} courses is tracked in{' '}
-        <Link href="/academics" className="font-semibold text-accent">Academics</Link>.
-      </p>
+      </section>
     </div>
   );
 }

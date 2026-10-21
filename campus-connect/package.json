@@ -4,7 +4,8 @@
   "private": true,
   "packageManager": "npm@10.8.2",
   "workspaces": [
-    "apps/web"
+    "apps/web",
+    "apps/api"
   ],
   "scripts": {
     "dev": "turbo dev",

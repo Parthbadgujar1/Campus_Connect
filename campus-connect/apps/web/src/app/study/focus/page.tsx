@@ -146,9 +146,9 @@ export default function FocusPage() {
                 type="button"
                 aria-pressed={sound === s.id}
                 onClick={() => setSound(s.id)}
-                className={cn('press flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm font-semibold transition-colors', sound === s.id ? 'bg-accent-soft text-accent-soft-ink' : 'bg-surface-2 text-text-2')}
+                className={cn('press flex flex-col items-start gap-3 rounded-2xl border p-3 text-left text-sm font-semibold transition-colors', sound === s.id ? 'border-accent bg-accent-soft text-accent-soft-ink' : 'border-border bg-surface-2 text-text-2 hover:border-accent/40')}
               >
-                <s.icon className="h-4 w-4" aria-hidden="true" />
+                <s.icon className="h-5 w-5" aria-hidden="true" />
                 {s.label}
               </button>
             ))}

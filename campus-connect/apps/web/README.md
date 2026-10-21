@@ -62,7 +62,7 @@ src/
     watch/               Watch hub, video player (v/[id]), watch parties (party/[id])
     loops/               Full-screen loops
     games/               Arcade, memory, reflex, quiz
-    study/               Study hub, focus, flashcards, notes, live rooms
+    study/               Study hub, focus timer, notes
     admin/               Admin portal (role-gated) — students, moderation, lectures, content, announcements
   components/
     shell/               App shell (dock, rail, aura), ambience panel, providers

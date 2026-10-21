@@ -2,119 +2,88 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { Bookmark } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { BookOpen, Bookmark, BookmarkX, Briefcase, Calendar, Hash, MessageSquare, PlayCircle, ShoppingBag, VenetianMask } from 'lucide-react';
+import { del, get } from '@/lib/api/client';
+import { useAction, useInfinite, type Page } from '@/lib/api/hooks';
 import { Chip, ChipRow } from '@/components/ui/chip';
-import { EmptyState, PageHeader, SectionHeader } from '@/components/ui/layout';
-import { PostCard } from '@/components/feed/post-card';
-import { OpportunityCard } from '@/components/common/opportunity-card';
-import { ListingCard } from '@/components/common/cards';
-import { VideoCard } from '@/components/watch/video-card';
-import { opportunities } from '@/data/careers';
-import { posts } from '@/data/feed';
-import { marketListings } from '@/data/living';
-import { loops, videos } from '@/data/videos';
-import { useAppState } from '@/lib/store';
-import { gradientFor } from '@/lib/visuals';
+import { PageHeader } from '@/components/ui/layout';
+import { InfiniteList } from '@/components/ui/infinite';
+import { ago } from '@/lib/live-time';
+import { cn } from '@/lib/utils';
 
-const LENSES = ['Everything', 'Posts', 'Videos', 'Loops', 'Opportunities', 'Market'] as const;
-type Lens = (typeof LENSES)[number];
+type SavedType = 'post' | 'discussion' | 'event' | 'opportunity' | 'listing' | 'resource' | 'lecture' | 'hush_question';
+interface SavedItem {
+  type: SavedType;
+  id: string;
+  title: string;
+  available: boolean;
+  link: string;
+  savedAt: string;
+}
 
-export default function KeptPage() {
-  const saved = useAppState((s) => s.saved);
-  const [lens, setLens] = useState<Lens>('Everything');
+const KINDS: Array<{ type: SavedType; label: string; icon: LucideIcon }> = [
+  { type: 'post', label: 'Posts', icon: MessageSquare },
+  { type: 'discussion', label: 'Discussions', icon: Hash },
+  { type: 'event', label: 'Events', icon: Calendar },
+  { type: 'opportunity', label: 'Opportunities', icon: Briefcase },
+  { type: 'resource', label: 'Shelf', icon: BookOpen },
+  { type: 'lecture', label: 'Lectures', icon: PlayCircle },
+  { type: 'listing', label: 'Marketplace', icon: ShoppingBag },
+  { type: 'hush_question', label: 'Hush', icon: VenetianMask },
+];
+const KIND = Object.fromEntries(KINDS.map((k) => [k.type, k])) as Record<SavedType, (typeof KINDS)[number]>;
 
-  const groups = {
-    Posts: posts.filter((p) => saved.includes(p.id)),
-    Videos: videos.filter((v) => saved.includes(v.id)),
-    Loops: loops.filter((l) => saved.includes(l.id)),
-    Opportunities: opportunities.filter((o) => saved.includes(o.id)),
-    Market: marketListings.filter((m) => saved.includes(m.id)),
-  };
-  const count = Object.values(groups).reduce((n, list) => n + list.length, 0);
-  const show = (name: Exclude<Lens, 'Everything'>) => (lens === 'Everything' || lens === name) && groups[name].length > 0;
-
+function SavedRow({ item, onRemoved }: { item: SavedItem; onRemoved: () => void }) {
+  const remove = useAction(async () => {
+    await del(`/saved/${item.type}/${item.id}`);
+    onRemoved();
+  });
+  const k = KIND[item.type];
+  const body = (
+    <>
+      <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-2xl', item.available ? 'bg-accent-soft text-accent-soft-ink' : 'bg-surface-2 text-text-3')}>
+        <k.icon className="h-[18px] w-[18px]" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className={cn('line-clamp-2 font-semibold', !item.available && 'italic text-text-3')}>{item.title}</span>
+        <span className="block text-[12px] text-text-3">{k.label} · saved {ago(item.savedAt)}</span>
+      </span>
+    </>
+  );
   return (
-    <div className="mx-auto w-full max-w-3xl px-4 pb-36 md:px-8 md:pb-16">
-      <PageHeader title="Saved" subtitle={`${count} saved`} back backHref="/you" />
+    <div>
+      <div className="flex items-center gap-2 rounded-2xl border border-border bg-surface p-2 pr-1 shadow-card">
+        {item.available ? <Link href={item.link} className="press flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5">{body}</Link> : <div className="flex min-w-0 flex-1 items-center gap-3 p-1.5">{body}</div>}
+        <button type="button" onClick={() => void remove.run()} disabled={remove.pending} aria-label={`Remove “${item.title}” from saved`} className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-text-3 hover:bg-surface-2 hover:text-danger">
+          <BookmarkX className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </div>
+      {remove.error && <p className="mt-1 text-[12px] text-danger">{remove.error.message}</p>}
+    </div>
+  );
+}
 
-      <ChipRow className="mt-2">
-        {LENSES.map((item) => (
-          <Chip key={item} active={lens === item} onClick={() => setLens(item)}>
-            {item}
-            {item !== 'Everything' && groups[item].length > 0 && <span className="opacity-60">{groups[item].length}</span>}
-          </Chip>
+export default function SavedPage() {
+  const [type, setType] = useState<SavedType | null>(null);
+  const list = useInfinite<SavedItem>(`me:saved:${type ?? 'all'}`, (cursor, signal) => get<Page<SavedItem>>('/me/saved', { type: type ?? undefined, cursor: cursor ?? undefined, limit: 20 }, signal));
+  return (
+    <div className="mx-auto w-full max-w-3xl px-4 pb-28 md:px-8 md:pb-12">
+      <PageHeader title="Saved" subtitle="Everything you bookmarked, newest first" back backHref="/you" />
+      <ChipRow className="mb-4 mt-2">
+        <Chip active={!type} onClick={() => setType(null)}>Everything</Chip>
+        {KINDS.map((k) => (
+          <Chip key={k.type} active={type === k.type} onClick={() => setType(k.type)}>{k.label}</Chip>
         ))}
       </ChipRow>
-
-      {count === 0 && (
-        <EmptyState
-          icon={Bookmark}
-          title="Nothing saved yet"
-          description="Save a post, video, loop or opportunity and it shows up here."
-          className="mt-6"
-          action={<Link href="/discover" className="text-sm font-semibold text-accent">Explore Discover</Link>}
-        />
-      )}
-
-      <div key={lens} className="animate-rise mt-6 space-y-10">
-        {show('Posts') && (
-          <section>
-            <SectionHeader title="Posts" />
-            <div className="space-y-4">
-              {groups.Posts.map((post) => (
-                <PostCard key={post.id} post={post} />
-              ))}
-            </div>
-          </section>
-        )}
-        {show('Videos') && (
-          <section>
-            <SectionHeader title="Videos" />
-            <div className="grid gap-x-5 gap-y-8 sm:grid-cols-2">
-              {groups.Videos.map((video) => (
-                <VideoCard key={video.id} video={video} />
-              ))}
-            </div>
-          </section>
-        )}
-        {show('Loops') && (
-          <section>
-            <SectionHeader title="Loops" />
-            <div className="no-scrollbar -mx-4 flex gap-3 overflow-x-auto px-4 md:mx-0 md:px-0">
-              {groups.Loops.map((loop) => (
-                <Link
-                  key={loop.id}
-                  href={`/loops?start=${loop.id}`}
-                  className="press flex aspect-[9/16] w-32 shrink-0 items-end overflow-hidden rounded-2xl p-3 text-sm font-semibold text-white shadow-card"
-                  style={{ background: gradientFor(loop.seed) }}
-                >
-                  <span className="line-clamp-3 drop-shadow">{loop.caption}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-        {show('Opportunities') && (
-          <section>
-            <SectionHeader title="Opportunities" />
-            <div className="space-y-3">
-              {groups.Opportunities.map((op) => (
-                <OpportunityCard key={op.id} opportunity={op} />
-              ))}
-            </div>
-          </section>
-        )}
-        {show('Market') && (
-          <section>
-            <SectionHeader title="Market" />
-            <div className="grid gap-3 sm:grid-cols-2">
-              {groups.Market.map((listing) => (
-                <ListingCard key={listing.id} listing={listing} />
-              ))}
-            </div>
-          </section>
-        )}
-      </div>
+      <InfiniteList
+        state={list}
+        skeleton="row"
+        className="space-y-2.5"
+        empty={{ icon: Bookmark, title: type ? `No saved ${KIND[type].label.toLowerCase()}` : 'Nothing saved yet', description: 'Tap the bookmark on posts, events, notes, openings and listings to keep them here.' }}
+        endMessage="That’s everything you saved"
+        render={(item) => <SavedRow item={item} onRemoved={() => list.setItems((items) => items.filter((x) => !(x.id === item.id && x.type === item.type)))} />}
+      />
     </div>
   );
 }

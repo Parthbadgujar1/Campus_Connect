@@ -1,174 +1,207 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
-import { Avatar } from '@/components/ui/avatar';
+import { useRef, useState, type FormEvent } from 'react';
+import { Camera, Trash2 } from 'lucide-react';
+import { FormField } from '@/components/auth/auth-layout';
 import { Button } from '@/components/ui/button';
-import { Field, Input, Select, Textarea } from '@/components/ui/fields';
+import { Input, Select, Textarea } from '@/components/ui/fields';
 import { Card, PageHeader, SectionHeader } from '@/components/ui/layout';
+import { PersonAvatar } from '@/components/ui/person-avatar';
+import { FormAlert, SkeletonList, Spinner } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
-import { college, me } from '@/data/people';
+import { errorMessage, get, isApiError, patch, upload } from '@/lib/api/client';
+import { invalidate, useQuery } from '@/lib/api/hooks';
+import type { FileView, Me } from '@/lib/api/types';
+import { useSession } from '@/lib/session';
 
-const BIO_LIMIT = 160;
+const LINKS = [
+  ['github', 'GitHub', 'https://github.com/you'],
+  ['linkedin', 'LinkedIn', 'https://linkedin.com/in/you'],
+  ['portfolio', 'Portfolio', 'https://your-site.com'],
+  ['leetcode', 'LeetCode', 'https://leetcode.com/you'],
+] as const;
 
-function splitList(value: string): string[] {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
+const splitList = (v: string) => [...new Set(v.split(',').map((s) => s.trim()).filter(Boolean))].slice(0, 30);
 
-export default function EditProfilePage() {
+function EditForm({ me }: { me: Me }) {
   const router = useRouter();
   const toast = useToast();
+  const { refresh } = useSession();
+  const p = me.profile;
+  const departments = useQuery<{ items: Array<{ id: string; name: string }> }>(`meta:departments:${me.college.slug}`, (s) => get(`/meta/colleges/${me.college.slug}/departments`, undefined, s));
   const [form, setForm] = useState({
-    name: me.name,
-    username: me.username,
-    bio: me.bio ?? '',
-    branch: me.branch ?? college.departments[0] ?? '',
-    year: String(me.year ?? 1),
-    semester: String(me.semester ?? 1),
-    division: me.division ?? 'A',
-    skills: me.skills.join(', '),
-    interests: me.interests.join(', '),
-    github: me.github ?? '',
-    linkedin: me.linkedin ?? '',
-  });
-  const [errors, setErrors] = useState<Partial<Record<'name' | 'username', string>>>({});
+    displayName: p.displayName,
+    username: p.username,
+    headline: p.headline ?? '',
+    bio: p.bio ?? '',
+    departmentId: p.departmentId ?? '',
+    year: p.year ? String(p.year) : '',
+    semester: p.semester ? String(p.semester) : '',
+    division: p.division ?? '',
+    skills: p.skills.join(', '),
+    interests: p.interests.join(', '),
+    ...Object.fromEntries(LINKS.map(([k]) => [k, p.links[k] ?? ''])),
+  } as Record<string, string>);
+  const [avatar, setAvatar] = useState<{ id: string | null; url: string | null }>({ id: null, url: p.avatarUrl });
+  const [avatarChanged, setAvatarChanged] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const update = (key: keyof typeof form) => (value: string) => setForm((f) => ({ ...f, [key]: value }));
+  const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const next: typeof errors = {};
-    if (form.name.trim().length < 2) next.name = 'Enter your full name.';
-    if (!/^[a-z0-9._]{3,24}$/i.test(form.username)) next.username = '3–24 letters, numbers, dots or underscores.';
-    setErrors(next);
-    if (Object.keys(next).length) return;
-    toast('Profile saved');
-    router.push('/profile/me');
+  const pickPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setFormError(null);
+    try {
+      const f = await upload<FileView>('avatar', file);
+      setAvatar({ id: f.id, url: f.thumbnailUrl ?? f.url });
+      setAvatarChanged(true);
+    } catch (err) {
+      setFormError(errorMessage(err));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const local: Record<string, string> = {};
+    if (form.displayName!.trim().length < 2) local.displayName = 'Enter your name.';
+    if (!/^[A-Za-z0-9._]{3,24}$/.test(form.username!)) local.username = 'Use 3–24 letters, numbers, dots or underscores.';
+    for (const [k, label] of LINKS) if (form[k] && !/^https:\/\/\S+$/.test(form[k]!)) local[k] = `${label} must be a full link starting with https://`;
+    setErrors(local);
+    if (Object.keys(local).length) return;
+    setPending(true);
+    setFormError(null);
+    try {
+      await patch('/me/profile', {
+        displayName: form.displayName!.trim(),
+        username: form.username!.trim(),
+        headline: form.headline!.trim() || null,
+        bio: form.bio!.trim() || null,
+        departmentId: form.departmentId || null,
+        year: form.year ? Number(form.year) : null,
+        semester: form.semester ? Number(form.semester) : null,
+        division: form.division!.trim() || null,
+        skills: splitList(form.skills!),
+        interests: splitList(form.interests!),
+        links: Object.fromEntries(LINKS.map(([k]) => [k, form[k]?.trim() || undefined]).filter(([, v]) => v)),
+        ...(avatarChanged ? { avatarFileId: avatar.id } : {}),
+      });
+      await refresh();
+      invalidate('profile:', 'feed:', 'home:');
+      toast('Profile saved');
+      router.push('/you');
+    } catch (err) {
+      if (isApiError(err) && Object.keys(err.fields).length) setErrors(err.fields);
+      else setFormError(errorMessage(err));
+    } finally {
+      setPending(false);
+    }
   };
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 pb-28 md:px-8 md:pb-12">
-      <PageHeader
-        title="Edit profile"
-        back
-        backHref="/profile/me"
-        actions={
-          <Button size="sm" type="submit" form="edit-profile-form">
-            Save
-          </Button>
-        }
-      />
-
-      <form id="edit-profile-form" onSubmit={submit} className="mt-4 space-y-6" noValidate>
+    <form onSubmit={submit} noValidate className="space-y-8">
+      {formError && <FormAlert>{formError}</FormAlert>}
+      <section aria-label="Photo">
+        <SectionHeader title="Photo" description="A clear photo helps classmates recognise you. JPG, PNG or WebP, up to 5 MB." />
         <Card className="flex items-center gap-4 p-4">
-          <Avatar name={form.name || me.name} seed={me.id} size="lg" />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold">Profile photo</p>
-            <p className="text-xs text-text-3">Photos are uploaded from the mobile app in this preview.</p>
+          <PersonAvatar person={{ id: me.id, displayName: form.displayName || p.displayName, username: p.username, avatarUrl: avatar.url }} size="lg" />
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => { void pickPhoto(e.target.files?.[0]); e.target.value = ''; }} />
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading} aria-busy={uploading}>
+              {uploading ? <Spinner /> : <Camera className="h-4 w-4" aria-hidden="true" />} {avatar.url ? 'Change photo' : 'Add photo'}
+            </Button>
+            {avatar.url && (
+              <Button variant="ghost" size="sm" onClick={() => { setAvatar({ id: null, url: null }); setAvatarChanged(true); }}>
+                <Trash2 className="h-4 w-4" aria-hidden="true" /> Remove
+              </Button>
+            )}
           </div>
-          <Button variant="secondary" size="sm" onClick={() => toast('Photo upload opens on device (demo)')} type="button">
-            Change
-          </Button>
         </Card>
+      </section>
 
-        <section className="space-y-4">
-          <SectionHeader title="Basics" />
-          <Field label="Full name" htmlFor="pf-name" hint={errors.name ? undefined : 'Shown on your posts and chats'}>
-            <Input id="pf-name" value={form.name} onChange={(e) => update('name')(e.target.value)} aria-invalid={!!errors.name} />
-            {errors.name && <p role="alert" className="text-xs text-danger">{errors.name}</p>}
-          </Field>
-          <Field label="Username" htmlFor="pf-username">
-            <div className="flex items-center rounded-xl border border-border bg-surface focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20">
-              <span className="pl-3.5 text-text-3">@</span>
-              <Input
-                id="pf-username"
-                value={form.username}
-                onChange={(e) => update('username')(e.target.value)}
-                aria-invalid={!!errors.username}
-                className="h-11 border-0 bg-transparent px-1.5 focus:ring-0"
-              />
-            </div>
-            {errors.username && <p role="alert" className="text-xs text-danger">{errors.username}</p>}
-          </Field>
-          <Field label="Bio" htmlFor="pf-bio" hint={`${form.bio.length}/${BIO_LIMIT}`}>
-            <Textarea id="pf-bio" value={form.bio} maxLength={BIO_LIMIT} onChange={(e) => update('bio')(e.target.value)} />
-          </Field>
-        </section>
-
-        <section className="space-y-4">
-          <SectionHeader title="Academics" description="Used for matching, feeds and eligibility" />
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Department" htmlFor="pf-branch">
-              <Select id="pf-branch" value={form.branch} onChange={(e) => update('branch')(e.target.value)}>
-                {college.departments.map((d) => (
-                  <option key={d}>{d}</option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Year" htmlFor="pf-year">
-              <Select id="pf-year" value={form.year} onChange={(e) => update('year')(e.target.value)}>
-                {college.years.map((y) => (
-                  <option key={y} value={y}>
-                    Year {y}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Semester" htmlFor="pf-sem">
-              <Select id="pf-sem" value={form.semester} onChange={(e) => update('semester')(e.target.value)}>
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-                  <option key={s} value={s}>
-                    Semester {s}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Division" htmlFor="pf-div">
-              <Select id="pf-div" value={form.division} onChange={(e) => update('division')(e.target.value)}>
-                {college.divisions.map((d) => (
-                  <option key={d}>{d}</option>
-                ))}
-              </Select>
-            </Field>
-          </div>
-        </section>
-
-        <section className="space-y-4">
-          <SectionHeader title="Skills & links" />
-          <Field label="Skills" htmlFor="pf-skills" hint="Separate with commas">
-            <Input id="pf-skills" value={form.skills} onChange={(e) => update('skills')(e.target.value)} />
-          </Field>
-          <Field label="Interests" htmlFor="pf-interests" hint="Used for recommendations">
-            <Input id="pf-interests" value={form.interests} onChange={(e) => update('interests')(e.target.value)} />
-          </Field>
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field label="GitHub" htmlFor="pf-gh">
-              <Input id="pf-gh" placeholder="github.com/you" value={form.github} onChange={(e) => update('github')(e.target.value)} />
-            </Field>
-            <Field label="LinkedIn" htmlFor="pf-li">
-              <Input id="pf-li" placeholder="linkedin.com/in/you" value={form.linkedin} onChange={(e) => update('linkedin')(e.target.value)} />
-            </Field>
-          </div>
-          <p className="text-xs text-text-3">
-            {splitList(form.skills).length} skills · {splitList(form.interests).length} interests. Who sees these is controlled in{' '}
-            <Link href="/settings/privacy" className="font-semibold text-accent">
-              privacy controls
-            </Link>
-            .
-          </p>
-        </section>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="ghost" onClick={() => router.back()} type="button">
-            Cancel
-          </Button>
-          <Button type="submit">Save changes</Button>
+      <section aria-label="Basics" className="space-y-4">
+        <SectionHeader title="Basics" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField id="displayName" label="Name" error={errors.displayName}>
+            <Input id="displayName" value={form.displayName} onChange={set('displayName')} maxLength={80} autoComplete="name" />
+          </FormField>
+          <FormField id="username" label="Username" error={errors.username} hint="Your profile address: /profile/username">
+            <Input id="username" value={form.username} onChange={set('username')} maxLength={24} autoCapitalize="none" spellCheck={false} />
+          </FormField>
         </div>
-      </form>
+        <FormField id="headline" label="Headline" hint="One line, e.g. “TE Comp · loves backend and badminton”">
+          <Input id="headline" value={form.headline} onChange={set('headline')} maxLength={120} />
+        </FormField>
+        <FormField id="bio" label="Bio" hint={`${form.bio!.length}/300`}>
+          <Textarea id="bio" value={form.bio} onChange={set('bio')} maxLength={300} />
+        </FormField>
+      </section>
+
+      <section aria-label="Class" className="space-y-4">
+        <SectionHeader title="Class" description="Used for class and department posts. Choose who sees it in Privacy controls." />
+        <FormField id="departmentId" label="Department">
+          <Select id="departmentId" value={form.departmentId} onChange={set('departmentId')}>
+            <option value="">Not set</option>
+            {departments.data?.items.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </Select>
+        </FormField>
+        <div className="grid grid-cols-3 gap-3">
+          <FormField id="year" label="Year">
+            <Select id="year" value={form.year} onChange={set('year')}>
+              <option value="">–</option>
+              {[1, 2, 3, 4, 5, 6].map((y) => <option key={y} value={y}>{y}</option>)}
+            </Select>
+          </FormField>
+          <FormField id="semester" label="Semester">
+            <Select id="semester" value={form.semester} onChange={set('semester')}>
+              <option value="">–</option>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((s) => <option key={s} value={s}>{s}</option>)}
+            </Select>
+          </FormField>
+          <FormField id="division" label="Division">
+            <Input id="division" value={form.division} onChange={(e) => setForm((f) => ({ ...f, division: e.target.value.toUpperCase() }))} maxLength={8} />
+          </FormField>
+        </div>
+      </section>
+
+      <section aria-label="Skills and interests" className="space-y-4">
+        <SectionHeader title="Skills & interests" description="Separate with commas." />
+        <FormField id="skills" label="Skills"><Input id="skills" value={form.skills} onChange={set('skills')} /></FormField>
+        <FormField id="interests" label="Interests"><Input id="interests" value={form.interests} onChange={set('interests')} /></FormField>
+      </section>
+
+      <section aria-label="Links" className="space-y-4">
+        <SectionHeader title="Links" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          {LINKS.map(([k, label, placeholder]) => (
+            <FormField key={k} id={k} label={label} error={errors[k] ?? errors[`links.${k}`]}>
+              <Input id={k} type="url" inputMode="url" value={form[k]} onChange={set(k)} placeholder={placeholder} />
+            </FormField>
+          ))}
+        </div>
+      </section>
+
+      <div className="sticky bottom-[calc(72px+env(safe-area-inset-bottom))] z-10 flex justify-end gap-2 rounded-2xl border border-border bg-[var(--surface-solid)] p-3 shadow-float md:bottom-4">
+        <Button variant="ghost" onClick={() => router.back()}>Cancel</Button>
+        <Button type="submit" disabled={pending || uploading} aria-busy={pending}>{pending && <Spinner />} Save profile</Button>
+      </div>
+    </form>
+  );
+}
+
+export default function EditProfilePage() {
+  const { user } = useSession();
+  return (
+    <div className="mx-auto w-full max-w-2xl px-4 pb-40 md:px-8 md:pb-16">
+      <PageHeader title="Edit profile" back backHref="/you" />
+      {user ? <EditForm me={user} /> : <SkeletonList count={2} />}
     </div>
   );
 }
