@@ -19,7 +19,7 @@ export function defaultProfile(input: { username: string; displayName: string })
     links: {},
     avatarFileId: null,
     isVerified: false,
-    visibility: { profile: 'campus', showBranch: true, showEmail: false, showActivity: false },
+    visibility: { profile: 'campus', showBranch: true, showEmail: false, showActivity: false, showOnline: true },
     messagePrivacy: 'everyone',
     followersCount: 0,
     followingCount: 0,
@@ -30,7 +30,7 @@ export function defaultProfile(input: { username: string; displayName: string })
 export function defaultSettings(): UserSettings {
   return {
     theme: 'system',
-    font: 'handwritten',
+    font: 'pro',
     textSize: 'md',
     reduceMotion: false,
     highContrast: false,

@@ -64,7 +64,7 @@ export interface Profile {
   links: Record<string, string>;
   avatarFileId: string | null;
   isVerified: boolean;
-  visibility: { profile: 'campus' | 'connections'; showBranch: boolean; showEmail: boolean; showActivity: boolean };
+  visibility: { profile: 'campus' | 'connections'; showBranch: boolean; showEmail: boolean; showActivity: boolean; /** "Last seen & online" in chats (missing = shown). */ showOnline?: boolean };
   messagePrivacy: 'everyone' | 'connections' | 'nobody';
   followersCount: number;
   followingCount: number;
@@ -72,8 +72,8 @@ export interface Profile {
 }
 
 export interface UserSettings {
-  theme: 'system' | 'day' | 'night' | 'paper';
-  font: 'handwritten' | 'classic' | 'system' | 'readable';
+  theme: 'system' | 'pro' | 'day' | 'night' | 'paper';
+  font: 'pro' | 'handwritten' | 'classic' | 'system' | 'readable';
   textSize: 'sm' | 'md' | 'lg';
   reduceMotion: boolean;
   highContrast: boolean;
@@ -111,6 +111,11 @@ export interface User {
   failedLoginCount: number;
   lockedUntil: Date | null;
   lastLoginAt: Date | null;
+  /** When the person last had the app open (for "last seen"). */
+  lastActiveAt?: Date | null;
+  /** Given at sign-up; private (only the person and admins reviewing sign-ups see them). */
+  phone?: string | null;
+  dateOfBirth?: Date | null;
   passwordChangedAt: Date | null;
   termsVersion: string | null;
   termsAcceptedAt: Date | null;
@@ -328,10 +333,45 @@ export interface Post {
   likesCount: number;
   commentsCount: number;
   savesCount: number;
+  /** People who watched a video post (Loops), each counted once. Missing on older posts. */
+  viewsCount?: number;
+  /** Cover image chosen for a video post (shown before it plays and in profile grids). */
+  coverFileId?: string | null;
   status: ContentStatus;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
+}
+
+/** A WhatsApp-style status: deleted automatically when expiresAt passes. */
+export interface Status {
+  _id: string;
+  collegeId: string;
+  userId: string;
+  kind: 'text' | 'image' | 'video';
+  text: string | null;
+  background: string;
+  fileId: string | null;
+  caption: string | null;
+  viewsCount: number;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+export interface StatusView {
+  _id: string; // status:viewer
+  statusId: string;
+  ownerId: string;
+  viewerId: string;
+  createdAt: Date;
+  expiresAt: Date;
+}
+
+export interface PostWatch {
+  _id: string; // post:user
+  postId: string;
+  userId: string;
+  createdAt: Date;
 }
 
 export interface PollVote {
@@ -520,6 +560,8 @@ export interface Message {
   payload: Record<string, unknown>;
   /** Idempotency key from the sender's device; unique per chat and sender. */
   clientId: string | null;
+  /** Sent on from another chat (shown as "Forwarded"). */
+  forwarded?: boolean;
   editedAt: Date | null;
   deletedAt: Date | null;
   createdAt: Date;
@@ -945,6 +987,9 @@ export interface Models {
   posts: Post;
   poll_votes: PollVote;
   post_likes: PostLike;
+  post_views: PostWatch;
+  statuses: Status;
+  status_views: StatusView;
   comments: Comment;
   saved_items: SavedItem;
   events: CampusEvent;

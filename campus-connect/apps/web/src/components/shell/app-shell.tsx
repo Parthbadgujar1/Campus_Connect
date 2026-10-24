@@ -12,6 +12,7 @@ import { CookieBanner } from '@/components/shell/cookie-banner';
 import { PublicShell } from '@/components/shell/public-shell';
 import { BackToTop, OfflineBanner, ScrollProgress, SkipLink } from '@/components/shell/site-chrome';
 import { START_TOUR_EVENT, Tour } from '@/components/shell/tour';
+import { LiveSync } from './live-sync';
 import { del, get } from '@/lib/api/client';
 import { useQuery, invalidate } from '@/lib/api/hooks';
 import { FULLSCREEN_PATTERN, TABS, sectionFor, type Section, type TabItem } from '@/lib/nav';
@@ -135,6 +136,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <CookieBanner />
       <Tour open={tourOpen} onFinish={finishTour} />
       <SurveyGate />
+      {status === 'signed-in' && <LiveSync />}
     </>
   );
 }

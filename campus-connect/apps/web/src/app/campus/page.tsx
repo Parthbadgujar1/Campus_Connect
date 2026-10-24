@@ -149,7 +149,7 @@ export default function CampusPage() {
       <header className="pt-safe flex items-start justify-between gap-4 pt-6 md:pt-10">
         <Reveal className="min-w-0">
           <h1 className="marker-heading hl-blue text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Campus</h1>
-          <p className="mt-1 text-[14px] text-text-3">{user?.college.name}</p>
+          {user?.role !== 'expert' && <p className="mt-1 text-[14px] text-text-3">{user?.college.name}</p>}
         </Reveal>
         <div className="flex shrink-0 items-center gap-2">
           {can(user, 'study') && (

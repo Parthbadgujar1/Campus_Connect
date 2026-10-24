@@ -142,6 +142,7 @@ export async function purgeAccount(deps: Deps, userId: string): Promise<boolean>
   await Promise.all([
     db.col('comments').deleteMany({ postId: { $in: postIds } }),
     db.col('post_likes').deleteMany({ postId: { $in: postIds } }),
+    db.col('post_views').deleteMany({ postId: { $in: postIds } }),
     db.col('poll_votes').deleteMany({ postId: { $in: postIds } }),
     db.col('saved_items').deleteMany({ itemType: 'post', itemId: { $in: postIds } }),
   ]);
@@ -195,6 +196,9 @@ export async function purgeAccount(deps: Deps, userId: string): Promise<boolean>
     db.col('sessions').deleteMany({ userId }),
     db.col('push_tokens').deleteMany({ userId }),
     db.col('post_likes').deleteMany({ userId }),
+    db.col('post_views').deleteMany({ userId }),
+    db.col('statuses').deleteMany({ userId }),
+    db.col('status_views').deleteMany({ $or: [{ viewerId: userId }, { ownerId: userId }] }),
     db.col('poll_votes').deleteMany({ userId }),
     db.col('votes').deleteMany({ userId }),
     db.col('event_rsvps').deleteMany({ userId }),

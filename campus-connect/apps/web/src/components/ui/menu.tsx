@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,17 @@ export function Menu({ label, items, trigger, align = 'right' }: { label: string
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const visible = items.filter((i) => !i.hidden);
+  const popup = useRef<HTMLDivElement>(null);
+  // Opens upward when there is not enough room below (for example a composer at the bottom).
+  const [up, setUp] = useState(false);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const b = button.current?.getBoundingClientRect();
+    const h = popup.current?.offsetHeight ?? 0;
+    if (!b) return;
+    const below = window.innerHeight - b.bottom;
+    setUp(below < h + 12 && b.top > below);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -67,11 +78,13 @@ export function Menu({ label, items, trigger, align = 'right' }: { label: string
       </button>
       {open && (
         <div
+          ref={popup}
           id={id}
           role="menu"
           aria-label={label}
           className={cn(
-            'font-sans animate-pop absolute top-10 z-30 min-w-[200px] overflow-hidden rounded-2xl border border-border bg-[var(--surface-solid)] py-1.5 shadow-float',
+            'font-sans animate-pop absolute z-30 min-w-[200px] overflow-hidden rounded-2xl border border-border bg-[var(--surface-solid)] py-1.5 shadow-float',
+            up ? 'bottom-10' : 'top-10',
             align === 'right' ? 'right-0' : 'left-0',
           )}
         >

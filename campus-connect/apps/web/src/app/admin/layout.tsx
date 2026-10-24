@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, ClipboardList, Inbox, LayoutGrid, MessageSquareHeart, Server, ShieldAlert, Users } from 'lucide-react';
+import { BarChart3, Building2, ClipboardList, Inbox, LayoutGrid, MessageSquareHeart, Server, ShieldAlert, Users } from 'lucide-react';
 import { PageHeader } from '@/components/ui/layout';
 import { useSession } from '@/lib/session';
 import { can, ROLE_LABEL, type Capability } from '@/lib/roles';
@@ -22,6 +22,7 @@ const SECTIONS: Array<{ href: string; label: string; icon: LucideIcon; needs: Ca
   { href: '/admin/surveys', label: 'Surveys', icon: ClipboardList, needs: 'admin.surveys' },
   { href: '/admin/feedback', label: 'Feedback', icon: MessageSquareHeart, needs: 'admin.feedback' },
   { href: '/admin/inbox', label: 'Inbox', icon: Inbox, needs: 'admin.system' },
+  { href: '/admin/colleges', label: 'Colleges', icon: Building2, needs: 'admin.system' },
   { href: '/admin/system', label: 'System', icon: Server, needs: 'admin.system' },
 ];
 

@@ -24,7 +24,7 @@ export default function PrivacyControlsPage() {
   const reports = useQuery<{ items: Array<{ id: string; targetType: string; reason: string; status: string; outcome: string; createdAt: string }> }>('me:reports', (s) => get('/reports/mine', undefined, s));
 
   if (!user) return <SkeletonList className="mx-auto mt-8 max-w-2xl px-4" count={2} />;
-  const vis = { profile: 'campus' as ProfileVisibility, showBranch: true, showEmail: false, showActivity: false, ...user.profile.visibility };
+  const vis = { profile: 'campus' as ProfileVisibility, showBranch: true, showEmail: false, showActivity: false, showOnline: true, ...user.profile.visibility };
 
   const save = async (change: Record<string, unknown>) => {
     try {
@@ -58,6 +58,7 @@ export default function PrivacyControlsPage() {
           <Switch label="Show department and year" description="On your profile and next to your name" checked={vis.showBranch} onChange={(v) => setVis('showBranch', v)} />
           <Switch label="Show my email" description="Lets classmates email you directly" checked={vis.showEmail} onChange={(v) => setVis('showEmail', v)} />
           <Switch label="Show my activity" description="Events you are going to and spaces you joined" checked={vis.showActivity} onChange={(v) => setVis('showActivity', v)} />
+          <Switch label="Last seen & online" description="Let people you chat with see when you are online and when you were last here" checked={vis.showOnline !== false} onChange={(v) => setVis('showOnline', v)} />
         </Card>
       </section>
 

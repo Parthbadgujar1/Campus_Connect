@@ -67,7 +67,7 @@ export const ROLE_LABEL: Record<ApiRole, string> = {
 const PAGE_CAPABILITY: Array<[RegExp, Capability]> = [
   [/^\/admin\/surveys/, 'admin.surveys'],
   [/^\/admin\/feedback/, 'admin.feedback'],
-  [/^\/admin\/(system|inbox)/, 'admin.system'],
+  [/^\/admin\/(system|inbox|colleges)/, 'admin.system'],
   [/^\/admin\/content/, 'admin.queue'],
   [/^\/admin\/(people|students|roles)/, 'admin.people'],
   [/^\/admin\/moderation/, 'admin.moderation'],

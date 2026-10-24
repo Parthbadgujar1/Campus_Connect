@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
+import { Hourglass } from 'lucide-react';
 import { AuthLayout, FormField } from '@/components/auth/auth-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/fields';
@@ -15,7 +16,7 @@ function Verify() {
   const token = useSearchParams().get('token') ?? '';
   const router = useRouter();
   const { adopt } = useSession();
-  const [state, setState] = useState<'working' | 'failed'>(token ? 'working' : 'failed');
+  const [state, setState] = useState<'working' | 'failed' | 'approval'>(token ? 'working' : 'failed');
   const [message, setMessage] = useState(token ? '' : 'This page needs the link from your email.');
   const [email, setEmail] = useState('');
   const [resent, setResent] = useState(false);
@@ -25,9 +26,15 @@ function Verify() {
     // Links are single-use, so the request must run exactly once (React may mount twice in dev).
     if (!token || started.current) return;
     started.current = true;
-    post<SessionPayload>('/auth/verify-email', { token })
+    post<SessionPayload | { status: 'approval_pending'; message: string }>('/auth/verify-email', { token })
       .then(async (payload) => {
-        await adopt(payload);
+        // Faculty and experts: email confirmed; they can sign in once an admin approves.
+        if ('status' in payload && payload.status === 'approval_pending') {
+          setMessage(payload.message);
+          setState('approval');
+          return;
+        }
+        await adopt(payload as SessionPayload);
         router.replace('/welcome');
       })
       .catch((err) => {
@@ -37,6 +44,18 @@ function Verify() {
   }, [token, adopt, router]);
 
   if (state === 'working') return <Spinner label="Confirming your email…" />;
+  if (state === 'approval') {
+    return (
+      <div className="space-y-4">
+        <FormAlert tone="success">Your email is confirmed.</FormAlert>
+        <div className="flex items-start gap-3 rounded-2xl bg-info-soft p-4 text-info">
+          <Hourglass className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <p className="font-sans text-[14px]">{message}</p>
+        </div>
+        <Link href="/login" className="font-sans block text-center text-[14px] font-semibold text-accent hover:underline">Back to sign in</Link>
+      </div>
+    );
+  }
   return (
     <div className="space-y-4">
       <FormAlert>{message}</FormAlert>

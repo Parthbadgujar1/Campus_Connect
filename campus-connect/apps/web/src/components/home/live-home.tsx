@@ -2,80 +2,24 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowBigUp, Bell, CalendarClock, ChevronRight, ClipboardCheck, Flag, Megaphone, MessageCircleQuestion, ShieldCheck, Upload, Users, X } from 'lucide-react';
+import { ArrowBigUp, Bell, ClipboardCheck, Flag, Megaphone, Search, ShieldCheck, Upload, Users, X } from 'lucide-react';
 import { Composer } from '@/components/feed/composer';
 import { LivePostCard } from '@/components/feed/live-post-card';
 import { AmbienceButton } from '@/components/shell/ambience';
 import { UnderlineTabs } from '@/components/ui/chip';
 import { SectionHeader } from '@/components/ui/layout';
-import { PersonAvatar } from '@/components/ui/person-avatar';
-import { ErrorState, LoadMore, Skeleton, SkeletonList } from '@/components/ui/states';
+import { StatusStrip } from '@/components/status/status';
+import { CampusFinds, greeting, LoopsStrip, PlayAndAsk, SpacesStrip, UpNext } from './home-sections';
+import { ErrorState, LoadMore, SkeletonList } from '@/components/ui/states';
 import { get } from '@/lib/api/client';
 import { useInfinite, useQuery, type Page } from '@/lib/api/hooks';
-import type { EventView, OpportunityView, PersonSummary, PostView } from '@/lib/api/types';
-import { ago, daysLeft, monthDay, time } from '@/lib/live-time';
+import type { PersonSummary, PostView } from '@/lib/api/types';
+import { ago } from '@/lib/live-time';
 import { useSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { useState, Suspense } from 'react';
 
 type Scope = 'all' | 'following' | 'campus' | 'class';
-
-function Upcoming() {
-  const q = useQuery<Page<EventView>>('home:events', (s) => get('/events', { limit: 3 }, s));
-  if (q.error) return <ErrorState compact error={q.error} onRetry={q.reload} />;
-  if (q.loading) return <SkeletonList variant="tile" count={3} className="md:grid-cols-3" />;
-  if (!q.data!.items.length) return <p className="rounded-2xl border border-dashed border-border p-5 text-center text-[14px] text-text-3">No events coming up. <Link href="/events?create=1" className="font-semibold text-accent">Create one</Link></p>;
-  return (
-    <div className="stagger grid gap-3 md:grid-cols-3">
-      {q.data!.items.map((e) => {
-        const md = monthDay(e.startsAt);
-        return (
-          <Link key={e.id} href={`/events/${e.id}`} className="press flex items-center gap-3.5 rounded-2xl border border-border bg-surface p-3.5 transition-colors hover:border-accent/40">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-accent-soft text-center text-accent-soft-ink">
-              <span className="leading-tight">
-                <span className="block text-[11px] font-semibold uppercase">{md.month}</span>
-                <span className="block text-[20px] font-bold">{md.day}</span>
-              </span>
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="line-clamp-2 block text-[15px] font-semibold leading-snug">{e.title}</span>
-              <span className="mt-0.5 block truncate text-[13px] text-text-3">{time(e.startsAt)} · {e.venue}</span>
-              {e.myRsvp === 'going' && <span className="font-sans mt-1 inline-block rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success">You’re going</span>}
-            </span>
-          </Link>
-        );
-      })}
-    </div>
-  );
-}
-
-function Closing() {
-  const q = useQuery<Page<OpportunityView>>('home:opps', (s) => get('/opportunities', { limit: 3 }, s));
-  if (q.error) return <ErrorState compact error={q.error} onRetry={q.reload} />;
-  if (q.loading) return <SkeletonList variant="row" count={3} />;
-  if (!q.data!.items.length) return <p className="rounded-2xl border border-dashed border-border p-5 text-center text-[14px] text-text-3">Nothing closing soon.</p>;
-  return (
-    <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
-      {q.data!.items.map((o) => {
-        const days = daysLeft(o.deadline);
-        return (
-          <li key={o.id}>
-            <Link href={`/opportunities/${o.id}`} className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-surface-2">
-              <CalendarClock className={cn('h-5 w-5 shrink-0', days <= 3 ? 'text-warning' : 'text-text-3')} aria-hidden="true" />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[15px] font-semibold">{o.title}</span>
-                <span className="block truncate text-[13px] text-text-3">{o.orgName}</span>
-              </span>
-              <span className={cn('font-sans shrink-0 rounded-full px-2.5 py-0.5 text-[12px] font-semibold', days <= 3 ? 'bg-warning-soft text-warning' : 'bg-surface-2 text-text-2')}>
-                {days <= 0 ? 'Today' : `${days} days`}
-              </span>
-            </Link>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
 
 function Notices() {
   const q = useQuery<Page<{ id: string; title: string; authorLabel: string; publishedAt: string; pinned: boolean; category: string }>>('home:notices', (s) => get('/announcements', { limit: 3 }, s));
@@ -121,45 +65,6 @@ function Boards() {
         </li>
       ))}
     </ul>
-  );
-}
-
-function HushPreview() {
-  const q = useQuery<Page<{ id: string; topic: string; body: string; answersCount: number }>>('home:hush', (s) => get('/hush', { sort: 'top', limit: 3 }, s));
-  if (q.error) return <ErrorState compact error={q.error} onRetry={q.reload} />;
-  if (q.loading) return <SkeletonList variant="row" count={3} />;
-  return (
-    <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
-      {q.data!.items.map((h) => (
-        <li key={h.id}>
-          <Link href={`/hush/${h.id}`} className="flex items-start gap-4 px-4 py-3.5 transition-colors hover:bg-surface-2">
-            <MessageCircleQuestion className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-semibold capitalize text-text-3">{h.topic.replace('_', ' ')}</span>
-              <span className="line-clamp-2 block text-[15px] font-semibold leading-snug">{h.body}</span>
-              <span className="mt-1 block text-[13px] text-text-3">{h.answersCount} {h.answersCount === 1 ? 'answer' : 'answers'}</span>
-            </span>
-            <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-text-3" aria-hidden="true" />
-          </Link>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function PeopleRow() {
-  const q = useQuery<Page<PersonSummary & { isFollowing: boolean }>>('home:people', (s) => get('/users', { limit: 12 }, s));
-  if (q.loading) return <div className="flex gap-4">{Array.from({ length: 6 }, (_, i) => <Skeleton key={i} className="h-16 w-16 shrink-0 rounded-full" />)}</div>;
-  if (q.error || !q.data?.items.length) return null;
-  return (
-    <div className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-1 md:mx-0 md:px-0" role="list" aria-label="People at your college">
-      {q.data.items.map((p) => (
-        <Link key={p.id} href={`/profile/${p.username}`} role="listitem" className="press flex w-16 shrink-0 flex-col items-center gap-1.5 text-center">
-          <PersonAvatar person={p} size="lg" />
-          <span className="w-full truncate text-[12px] text-text-2">{p.displayName.split(' ')[0]}</span>
-        </Link>
-      ))}
-    </div>
   );
 }
 
@@ -256,57 +161,51 @@ export function LiveHome() {
   const { user } = useSession();
   const bell = useQuery<{ count: number }>('badge:notifications', (s) => get('/notifications/unread-count', undefined, s), { refreshMs: 60_000 });
   const unread = bell.data?.count ?? 0;
-  const dateLabel = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' });
+  const first = user?.profile.displayName.split(' ')[0] ?? 'there';
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 pb-36 md:px-8 md:pb-16">
       <header className="pt-safe flex items-start justify-between gap-4 pt-6 md:pt-10">
         <div className="min-w-0">
-          <p className="text-[14px] text-text-3">{dateLabel}</p>
-          <h1 className="marker-heading hl-yellow mt-1 text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Hi, {user?.profile.displayName.split(' ')[0] ?? 'there'}</h1>
+          <p className="text-[14px] text-text-3">{greeting()}</p>
+          <h1 className="mt-0.5 truncate text-[34px] font-bold leading-none tracking-tight md:text-[40px]">{first}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-1">
+          <Link href="/search" aria-label="Search" className="press grid h-10 w-10 place-items-center rounded-full border border-border bg-surface text-text-2 shadow-card hover:text-text">
+            <Search className="h-[18px] w-[18px]" aria-hidden="true" />
+          </Link>
           <span className="md:hidden" data-tour="appearance">
             <AmbienceButton />
           </span>
-          <Link href="/notifications" aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`} className="press relative grid h-10 w-10 place-items-center rounded-full bg-surface text-text-2 shadow-card hover:text-text">
+          <Link href="/notifications" aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`} className="press relative grid h-10 w-10 place-items-center rounded-full border border-border bg-surface text-text-2 shadow-card hover:text-text">
             <Bell className="h-[18px] w-[18px]" aria-hidden="true" />
-            {unread > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-danger" aria-hidden="true" />}
+            {unread > 0 && <span className="font-sans absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">{unread > 9 ? '9+' : unread}</span>}
           </Link>
         </div>
       </header>
 
-      <div className="mt-5">
-        <PeopleRow />
-      </div>
+      <StatusStrip />
 
-      <div className="mt-8 space-y-10">
+      <div className="mt-6 space-y-9">
         <StaffTools />
-        <section aria-label="Happening soon">
-          <SectionHeader tone="yellow" title="Happening soon" action={{ label: 'All events', href: '/events' }} />
-          <Upcoming />
-        </section>
-        <div className="grid gap-10 md:grid-cols-2">
-          <section aria-label="Closing soon">
-            <SectionHeader tone="green" title="Closing soon" action={{ label: 'Opportunities', href: '/opportunities' }} />
-            <Closing />
-          </section>
+        <UpNext />
+        <LoopsStrip />
+        <SpacesStrip />
+        <PlayAndAsk />
+        <CampusFinds />
+        <Suspense fallback={<SkeletonList count={2} />}>
+          <Feed />
+        </Suspense>
+        <div className="grid gap-9 md:grid-cols-2">
           <section aria-label="Notices">
             <SectionHeader tone="blue" title="Notices" action={{ label: 'All notices', href: '/news' }} />
             <Notices />
           </section>
+          <section aria-label="Boards">
+            <SectionHeader tone="blue" title="Boards" description="Top discussions from your spaces" action={{ label: 'Open boards', href: '/spaces' }} />
+            <Boards />
+          </section>
         </div>
-        <Suspense fallback={<SkeletonList count={2} />}>
-          <Feed />
-        </Suspense>
-        <section aria-label="Boards">
-          <SectionHeader tone="blue" title="Boards" description="Top discussions from your spaces" action={{ label: 'Open boards', href: '/spaces' }} />
-          <Boards />
-        </section>
-        <section aria-label="Hush">
-          <SectionHeader tone="violet" title="Hush" description="Anonymous questions, answered by people who know" action={{ label: 'Open Hush', href: '/hush' }} />
-          <HushPreview />
-        </section>
       </div>
     </div>
   );

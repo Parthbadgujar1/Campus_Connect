@@ -31,6 +31,16 @@ const MAX_FAILURES_PER_EMAIL = 5;
 // High on purpose: many people can share one public address (a college or office network, a
 // mobile carrier's NAT), and a low limit would let one person lock everyone else out.
 const MAX_FAILURES_PER_NETWORK = 100;
+/** People must be at least this old to sign up (worked out from the date of birth). */
+export const MINIMUM_AGE = 18;
+
+/** Whole years between a date of birth and a day (birthdays counted in UTC). */
+export function ageOn(dob: Date, day: Date): number {
+  let age = day.getUTCFullYear() - dob.getUTCFullYear();
+  const m = day.getUTCMonth() - dob.getUTCMonth();
+  if (m < 0 || (m === 0 && day.getUTCDate() < dob.getUTCDate())) age--;
+  return age;
+}
 
 export type SignupRole = 'student' | 'faculty' | 'expert';
 
@@ -115,23 +125,30 @@ export class AuthService {
       password: string;
       displayName: string;
       role: SignupRole;
-      roleInfo: RoleInfo;
+      roleInfo?: RoleInfo;
+      phone: string;
+      dateOfBirth: string;
       acceptTerms: boolean;
-      confirmAdult: boolean;
+      confirmAdult?: boolean;
       marketingOptIn: boolean;
       anonymousId?: string;
       /** The college chosen on the sign-up form. Optional when the deployment has one college. */
       collegeId?: string;
     },
     meta: RequestMeta,
-  ): Promise<void> {
+  ): Promise<{ verifyUrl: string } | void> {
     if (!input.acceptTerms) throw Errors.validation([{ field: 'acceptTerms', message: 'Please accept the terms and privacy policy.' }]);
-    if (!input.confirmAdult) throw Errors.validation([{ field: 'confirmAdult', message: 'CampusConnect is for people aged 18 or over.' }]);
 
-    // Any email address works (Gmail, Outlook, a college address...). The college is the one
-    // chosen on the form; if none was chosen, a known college email domain or the only college
-    // decides. Roles are not inferred from the address: faculty and expert access is reviewed.
-    const college = await this.resolveCollege(input.collegeId, input.email);
+    // The age is worked out from the date of birth: CampusConnect is for people aged 18 or over.
+    const dob = new Date(`${input.dateOfBirth}T00:00:00Z`);
+    const age = ageOn(dob, new Date());
+    if (Number.isNaN(dob.getTime()) || age < 0 || age > 100) throw Errors.validation([{ field: 'dateOfBirth', message: 'Enter a valid date of birth.' }]);
+    if (age < MINIMUM_AGE) throw Errors.validation([{ field: 'dateOfBirth', message: `CampusConnect is for people aged ${MINIMUM_AGE} or over.` }]);
+
+    // Any email address works (Gmail, Outlook, a college address...). Students and faculty choose
+    // their college on the form; industry experts are not from a college, so they join the main
+    // one. Roles are not inferred from the address: faculty and expert access is reviewed.
+    const college = input.role === 'expert' ? await this.mainCollege() : await this.resolveCollege(input.collegeId, input.email);
 
     const problems = passwordProblems(input.password, { email: input.email, name: input.displayName });
     if (problems.length) throw Errors.weakPassword(problems);
@@ -151,7 +168,7 @@ export class AuthService {
     const now = new Date();
     const userId = uuidv7();
     const username = await this.uniqueUsername(input.email);
-    // Faculty and expert access needs an admin's review: until then the account is a student one.
+    // Faculty and expert accounts need an admin's approval before they can sign in at all.
     const pendingRole = input.role === 'student' ? null : input.role;
     const user: User = {
       _id: userId,
@@ -162,7 +179,9 @@ export class AuthService {
       role: 'student',
       pendingRole,
       status: 'pending',
-      roleInfo: input.roleInfo,
+      roleInfo: {},
+      phone: input.phone,
+      dateOfBirth: dob,
       failedLoginCount: 0,
       lockedUntil: null,
       lastLoginAt: null,
@@ -179,7 +198,7 @@ export class AuthService {
       updatedAt: now,
     };
 
-    await this.deps.db.tx(async (session) => {
+    const result = await this.deps.db.tx(async (session) => {
       await this.users.insertOne(user, { session });
       await this.deps.db.col('consents').insertMany(
         (['terms', 'privacy', 'marketing_email'] as const).map((purpose) => ({
@@ -196,16 +215,32 @@ export class AuthService {
         { session },
       );
       if (pendingRole) {
-        const note = [input.roleInfo.designation, input.roleInfo.organization, input.roleInfo.employeeId].filter(Boolean).join(' · ');
         await this.deps.db.col('verification_requests').insertOne(
-          { _id: uuidv7(), collegeId: college._id, userId, kind: pendingRole === 'faculty' ? 'faculty_role' : 'expert_role', status: 'pending', fileId: null, note: note || null, reviewerId: null, reviewerNote: null, reviewedAt: null, createdAt: now, updatedAt: now },
+          { _id: uuidv7(), collegeId: college._id, userId, kind: pendingRole === 'faculty' ? 'faculty_role' : 'expert_role', status: 'pending', fileId: null, note: null, reviewerId: null, reviewerNote: null, reviewedAt: null, createdAt: now, updatedAt: now },
           { session },
         );
       }
       const token = await this.issueEmailToken({ userId, email: input.email, purpose: 'verify_email', ttlMinutes: VERIFY_TTL_HOURS * 60, ipHash: meta.ipHash }, session);
-      await this.deps.mailer.enqueue({ to: input.email, template: 'verify_email', userId, payload: { name: input.displayName.split(' ')[0], url: `${this.deps.config.webUrl}/verify-email?token=${token}` } }, session);
+      const url = `${this.deps.config.webUrl}/verify-email?token=${token}`;
+      await this.deps.mailer.enqueue({ to: input.email, template: 'verify_email', userId, payload: { name: input.displayName.split(' ')[0], url } }, session);
       await audit(this.deps.db, { action: 'auth.register', actorId: userId, collegeId: college._id, entityType: 'user', entityId: userId, ipHash: meta.ipHash, requestId: meta.requestId, meta: { role: input.role } }, session);
+      return { verifyUrl: url };
     });
+    // Let the college's admins know a faculty or expert sign-up is waiting for them.
+    if (pendingRole) {
+      const admins = await this.users.find({ collegeId: college._id, role: 'admin', status: 'active' }, { projection: { _id: 1 } }).limit(50).toArray();
+      await this.deps.notifier
+        .send(admins.map((a) => ({ userId: a._id, kind: 'verification' as const, title: `${input.displayName} signed up as ${pendingRole === 'faculty' ? 'faculty' : 'an industry expert'}`, body: 'Approve or reject the sign-up in the admin console.', link: '/admin/people?tab=requests', actorId: userId, entityType: 'user', entityId: userId })))
+        .catch(() => undefined);
+    }
+    return result;
+  }
+
+  /** The college industry experts join: the oldest active one. */
+  private async mainCollege() {
+    const c = await this.deps.db.col('colleges').find({ status: 'active' }).sort({ createdAt: 1 }).limit(1).next();
+    if (!c) throw Errors.validation([{ field: 'collegeId', message: 'No college is set up yet.' }]);
+    return c;
   }
 
   async resendVerification(email: string, meta: RequestMeta): Promise<void> {
@@ -222,13 +257,18 @@ export class AuthService {
       const user = await this.users.findOneAndUpdate(
         { _id: t.userId ?? '', status: { $in: ['pending', 'active'] } },
         [{ $set: { emailVerifiedAt: { $ifNull: ['$emailVerifiedAt', '$$NOW'] }, status: 'active', updatedAt: '$$NOW' } }],
-        { session, returnDocument: 'after', projection: { role: 1, collegeId: 1, email: 1, 'profile.displayName': 1 } },
+        { session, returnDocument: 'after', projection: { role: 1, collegeId: 1, email: 1, pendingRole: 1, 'profile.displayName': 1 } },
       );
       if (!user) throw Errors.gone();
+      // Faculty and experts: email confirmed, but they sign in only after an admin approves.
+      if (user.pendingRole) {
+        await audit(this.deps.db, { action: 'auth.email_verified', actorId: user._id, collegeId: user.collegeId, entityType: 'user', entityId: user._id, ipHash: meta.ipHash, requestId: meta.requestId }, session);
+        return { userId: user._id, session: null, pendingRole: user.pendingRole };
+      }
       await this.deps.mailer.enqueue({ to: user.email, template: 'welcome', userId: user._id, payload: { name: user.profile.displayName.split(' ')[0] }, dedupeKey: `welcome:${user._id}` }, session);
       await audit(this.deps.db, { action: 'auth.email_verified', actorId: user._id, collegeId: user.collegeId, entityType: 'user', entityId: user._id, ipHash: meta.ipHash, requestId: meta.requestId }, session);
       const created = await this.sessions.create({ userId: user._id, role: user.role, kind: 'web', rememberMe: true, ipHash: meta.ipHash, userAgent: meta.userAgent }, session);
-      return { userId: user._id, session: created };
+      return { userId: user._id, session: created, pendingRole: null };
     });
   }
 
@@ -255,7 +295,7 @@ export class AuthService {
 
   async login(input: { email: string; password: string; rememberMe: boolean; client: 'web' | 'mobile' }, meta: RequestMeta) {
     await this.assertNotThrottled(input.email, meta.ipHash);
-    const user = await this.users.findOne({ email: input.email }, { projection: { passwordHash: 1, role: 1, status: 1, collegeId: 1, lockedUntil: 1 } });
+    const user = await this.users.findOne({ email: input.email }, { projection: { passwordHash: 1, role: 1, status: 1, collegeId: 1, lockedUntil: 1, pendingRole: 1 } });
 
     const ok = await verifyPassword(user?.passwordHash ?? null, input.password);
     if (!user || !ok || user.status === 'deleted') {
@@ -273,6 +313,10 @@ export class AuthService {
     if (user.status === 'suspended') {
       await this.recordAttempt(input.email, user._id, meta.ipHash, false, 'suspended');
       throw Errors.suspended();
+    }
+    if (user.pendingRole) {
+      await this.recordAttempt(input.email, user._id, meta.ipHash, false, 'approval_pending');
+      throw Errors.approvalPending(user.pendingRole);
     }
 
     const session = await this.sessions.create({ userId: user._id, role: user.role, kind: input.client, rememberMe: input.rememberMe, ipHash: meta.ipHash, userAgent: meta.userAgent });

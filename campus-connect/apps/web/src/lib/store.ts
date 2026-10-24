@@ -8,10 +8,11 @@
 import { useSyncExternalStore } from 'react';
 import type { Note } from './study';
 
-export type ThemePref = 'system' | 'day' | 'night' | 'paper';
+/** pro = CampusConnect Pro (light), day = Doodle, night = Pro Night, paper = Paper. */
+export type ThemePref = 'system' | 'pro' | 'day' | 'night' | 'paper';
 export type TextSize = 'sm' | 'md' | 'lg';
-/** handwritten = Kalam everywhere (the CampusConnect look), system = the device font, readable = Atkinson Hyperlegible. */
-export type FontPref = 'handwritten' | 'system' | 'readable';
+/** pro = Space Grotesk (CampusConnect Pro), handwritten = Kalam (Doodle), system = General (device font), readable = Atkinson Hyperlegible. */
+export type FontPref = 'pro' | 'handwritten' | 'system' | 'readable';
 
 export interface AppState {
   theme: ThemePref;
@@ -28,7 +29,7 @@ export const STORAGE_KEY = 'cc:v1';
 export const INITIAL_STATE: AppState = {
   theme: 'system',
   textSize: 'md',
-  font: 'handwritten',
+  font: 'pro',
   reduceMotion: false,
   seen: [],
   notes: [],
@@ -38,9 +39,9 @@ let snapshot: AppState = INITIAL_STATE;
 let hydrated = false;
 const listeners = new Set<() => void>();
 
-const THEMES: ThemePref[] = ['system', 'day', 'night', 'paper'];
+const THEMES: ThemePref[] = ['system', 'pro', 'day', 'night', 'paper'];
 const SIZES: TextSize[] = ['sm', 'md', 'lg'];
-const FONTS: FontPref[] = ['handwritten', 'system', 'readable'];
+const FONTS: FontPref[] = ['pro', 'handwritten', 'system', 'readable'];
 // Early builds stored three sample notes on every device.
 const SAMPLE_NOTES = new Set(['note-normal', 'note-deadlock', 'note-hackathon']);
 

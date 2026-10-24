@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { Briefcase, GraduationCap, Hourglass, MailCheck, Presentation } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Briefcase, ExternalLink, GraduationCap, Hourglass, MailCheck, Presentation } from 'lucide-react';
 import { AuthLayout, Checkbox, FormField } from '@/components/auth/auth-layout';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/fields';
@@ -14,9 +14,9 @@ import { useQuery } from '@/lib/api/hooks';
 import { usePublicConfig } from '@/components/shell/public-shell';
 import { cn } from '@/lib/utils';
 
-// Sign up with any email address and a password, like any app. People choose their college and
-// say who they are; students are in straight away (after confirming the email), while faculty
-// and industry experts use the app as students until an admin approves their role.
+// Sign up like any app: name, email, mobile, date of birth and a password. The age is worked out
+// from the date of birth (18 or over). Students and faculty choose their college at the end;
+// industry experts don't. Faculty and experts can sign in once an admin approves them.
 
 type Role = 'student' | 'faculty' | 'expert';
 
@@ -28,12 +28,23 @@ interface College {
 }
 
 const ROLES: Array<{ value: Role; label: string; hint: string; icon: typeof GraduationCap }> = [
-  { value: 'student', label: 'Student', hint: 'Studying at the college', icon: GraduationCap },
+  { value: 'student', label: 'Student', hint: 'Studying at a college', icon: GraduationCap },
   { value: 'faculty', label: 'Faculty', hint: 'Teaching or staff', icon: Presentation },
   { value: 'expert', label: 'Industry expert', hint: 'Alumni or mentor', icon: Briefcase },
 ];
 
-const THIS_YEAR = new Date().getFullYear();
+const MINIMUM_AGE = 18;
+
+function ageFrom(dob: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dob)) return null;
+  const d = new Date(`${dob}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age;
+}
 
 export default function RegisterPage() {
   const config = usePublicConfig();
@@ -42,17 +53,21 @@ export default function RegisterPage() {
   const [collegeId, setCollegeId] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [dob, setDob] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [info, setInfo] = useState({ enrollmentNumber: '', admissionYear: '', employeeId: '', designation: '', organization: '', linkedinUrl: '' });
   const [terms, setTerms] = useState(false);
-  const [adult, setAdult] = useState(false);
   const [marketing, setMarketing] = useState(false);
   const [pending, setPending] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [devLink, setDevLink] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
+  const age = useMemo(() => ageFrom(dob), [dob]);
+  const needsCollege = role !== 'expert';
+  const today = new Date().toISOString().slice(0, 10);
 
   // With a single college on this server, it is chosen for you.
   useEffect(() => {
@@ -60,22 +75,17 @@ export default function RegisterPage() {
     if (items.length === 1 && !collegeId) setCollegeId(items[0]!.id);
   }, [colleges.data, collegeId]);
 
-  const setField = (k: keyof typeof info, v: string) => setInfo((s) => ({ ...s, [k]: v }));
-
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!collegeId) e.collegeId = 'Choose your college.';
-    if (name.trim().length < 2) e.displayName = 'Enter your name as people know it.';
+    if (name.trim().length < 2) e.displayName = 'Enter your full name.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) e.email = 'Enter a valid email address.';
+    if (!/^\+?[0-9]{10,15}$/.test(phone.replace(/[\s()-]/g, ''))) e.phone = 'Enter a valid mobile number, for example +91 98765 43210.';
+    if (age === null || age > 100 || age < 0) e.dateOfBirth = 'Enter your date of birth.';
+    else if (age < MINIMUM_AGE) e.dateOfBirth = `CampusConnect is for people aged ${MINIMUM_AGE} or over.`;
     if (password.length < 10) e.password = 'Use at least 10 characters.';
     if (confirm !== password) e.confirm = 'The two passwords do not match.';
-    if (role === 'student' && !info.enrollmentNumber.trim()) e['roleInfo.enrollmentNumber'] = 'Enter your enrolment (PRN) number.';
-    if (role === 'faculty' && !info.employeeId.trim()) e['roleInfo.employeeId'] = 'Enter your employee ID.';
-    if (role !== 'student' && !info.designation.trim()) e['roleInfo.designation'] = role === 'faculty' ? 'Enter your designation, for example Assistant Professor.' : 'Enter your role, for example Senior Engineer.';
-    if (role === 'expert' && !info.organization.trim()) e['roleInfo.organization'] = 'Enter your company or organisation.';
-    if (role === 'expert' && info.linkedinUrl && !/^https:\/\/\S+$/.test(info.linkedinUrl.trim())) e['roleInfo.linkedinUrl'] = 'Use a full link that starts with https://';
+    if (needsCollege && !collegeId) e.collegeId = 'Choose your college.';
     if (!terms) e.acceptTerms = 'Please accept the terms and privacy policy to continue.';
-    if (!adult) e.confirmAdult = 'CampusConnect is for people aged 18 or over.';
     return e;
   };
 
@@ -87,18 +97,23 @@ export default function RegisterPage() {
     setFormError(null);
     if (Object.keys(local).length) {
       const first = Object.keys(local)[0]!;
-      document.getElementById(first === 'displayName' ? 'name' : first.replace('roleInfo.', 'info-'))?.focus();
+      document.getElementById(first === 'displayName' ? 'name' : first)?.focus();
       return;
     }
-    const roleInfo =
-      role === 'student'
-        ? { enrollmentNumber: info.enrollmentNumber.trim(), admissionYear: info.admissionYear ? Number(info.admissionYear) : undefined }
-        : role === 'faculty'
-          ? { employeeId: info.employeeId.trim(), designation: info.designation.trim() }
-          : { organization: info.organization.trim(), designation: info.designation.trim(), linkedinUrl: info.linkedinUrl.trim() || undefined };
     setPending(true);
     try {
-      await post('/auth/register', { email: email.trim(), password, displayName: name.trim(), role, roleInfo, collegeId, acceptTerms: terms, confirmAdult: adult, marketingOptIn: marketing });
+      const r = await post<{ devLink?: string }>('/auth/register', {
+        email: email.trim(),
+        password,
+        displayName: name.trim(),
+        role,
+        phone: phone.trim(),
+        dateOfBirth: dob,
+        collegeId: needsCollege ? collegeId : undefined,
+        acceptTerms: terms,
+        marketingOptIn: marketing,
+      });
+      setDevLink(r?.devLink ?? null);
       setDone(true);
     } catch (err) {
       if (isApiError(err)) {
@@ -113,16 +128,22 @@ export default function RegisterPage() {
 
   if (done) {
     return (
-      <AuthLayout title="Check your email" subtitle={<>We sent a link to <strong className="text-text">{email.trim()}</strong>. Open it to finish creating your account.</>}>
+      <AuthLayout title="Check your email" subtitle={<>We sent a link to <strong className="text-text">{email.trim()}</strong>. Open it to confirm your email.</>}>
         <div className="space-y-4">
           <div className="flex items-start gap-3 rounded-2xl border border-border bg-surface p-4">
             <MailCheck className="h-6 w-6 shrink-0 text-accent" aria-hidden="true" />
             <p className="font-sans text-[14px] text-text-2">The link works for 24 hours. Can&apos;t find it? Check spam or promotions, or send it again.</p>
           </div>
+          {devLink && (
+            <div className="space-y-2 rounded-2xl border border-dashed border-warning bg-warning-soft p-4 text-warning">
+              <p className="font-sans text-[13px] font-semibold">Local development: emails are not sent yet, so here is the link.</p>
+              <a href={devLink} className="font-sans inline-flex items-center gap-1.5 text-[14px] font-semibold underline"><ExternalLink className="h-4 w-4" aria-hidden="true" /> Confirm my email</a>
+            </div>
+          )}
           {role !== 'student' && (
             <div className="flex items-start gap-3 rounded-2xl bg-info-soft p-4 text-info">
               <Hourglass className="h-5 w-5 shrink-0" aria-hidden="true" />
-              <p className="font-sans text-[14px]">Your {role === 'faculty' ? 'faculty' : 'expert'} access will be reviewed by your college. You can use CampusConnect as a student until it is approved, and we will tell you when it is.</p>
+              <p className="font-sans text-[14px]">{role === 'faculty' ? 'Faculty accounts are approved by your college admin.' : 'Industry expert accounts are approved by an admin.'} You can sign in as soon as it is approved, and we will email you.</p>
             </div>
           )}
           {resent && <FormAlert tone="success">Sent again. It can take a minute to arrive.</FormAlert>}
@@ -190,72 +211,24 @@ export default function RegisterPage() {
               </motion.button>
             ))}
           </div>
+          {role !== 'student' && <p className="font-sans mt-2 text-[12px] text-text-3">{role === 'faculty' ? 'Faculty' : 'Industry expert'} accounts are approved by an admin before you can sign in.</p>}
         </fieldset>
 
-        <FormField id="collegeId" label="College" error={err('collegeId')}>
-          <Select id="collegeId" value={collegeId} onChange={(e) => setCollegeId(e.target.value)} disabled={colleges.loading} aria-invalid={Boolean(err('collegeId')) || undefined}>
-            <option value="">{colleges.loading ? 'Loading colleges…' : 'Choose your college'}</option>
-            {collegeList.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-                {c.city ? `, ${c.city}` : ''}
-              </option>
-            ))}
-          </Select>
-        </FormField>
-
-        <FormField id="name" label="Your name" error={err('displayName')}>
+        <FormField id="name" label="Full name" error={err('displayName')}>
           <Input id="name" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} aria-invalid={Boolean(err('displayName')) || undefined} />
         </FormField>
         <FormField id="email" label="Email" error={err('email')} hint="Any email you use: Gmail, Outlook, your college address…">
           <Input id="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={Boolean(err('email')) || undefined} />
         </FormField>
-
-          <motion.div key={role} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 rounded-2xl border border-border bg-surface p-4">
-            <p className="font-sans text-[13px] text-text-3">
-              {role === 'student' ? 'Used only to confirm you study here. Never shown on your profile.' : 'Your college checks these details before giving you this role. Never shown publicly.'}
-            </p>
-            {role === 'student' && (
-              <div className="grid grid-cols-2 gap-3">
-                <FormField id="info-enrollmentNumber" label="Enrolment (PRN) number" error={err('roleInfo.enrollmentNumber')}>
-                  <Input id="info-enrollmentNumber" value={info.enrollmentNumber} onChange={(e) => setField('enrollmentNumber', e.target.value)} maxLength={40} autoCapitalize="characters" />
-                </FormField>
-                <FormField id="info-admissionYear" label="Year of admission">
-                  <Select id="info-admissionYear" value={info.admissionYear} onChange={(e) => setField('admissionYear', e.target.value)}>
-                    <option value="">Choose</option>
-                    {Array.from({ length: 8 }, (_, i) => THIS_YEAR - i).map((y) => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </Select>
-                </FormField>
-              </div>
-            )}
-            {role === 'faculty' && (
-              <div className="grid grid-cols-2 gap-3">
-                <FormField id="info-employeeId" label="Employee ID" error={err('roleInfo.employeeId')}>
-                  <Input id="info-employeeId" value={info.employeeId} onChange={(e) => setField('employeeId', e.target.value)} maxLength={40} />
-                </FormField>
-                <FormField id="info-designation" label="Designation" error={err('roleInfo.designation')}>
-                  <Input id="info-designation" value={info.designation} onChange={(e) => setField('designation', e.target.value)} maxLength={120} placeholder="Assistant Professor" />
-                </FormField>
-              </div>
-            )}
-            {role === 'expert' && (
-              <>
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField id="info-organization" label="Company or organisation" error={err('roleInfo.organization')}>
-                    <Input id="info-organization" value={info.organization} onChange={(e) => setField('organization', e.target.value)} maxLength={160} />
-                  </FormField>
-                  <FormField id="info-designation" label="Your role" error={err('roleInfo.designation')}>
-                    <Input id="info-designation" value={info.designation} onChange={(e) => setField('designation', e.target.value)} maxLength={120} placeholder="Senior Engineer" />
-                  </FormField>
-                </div>
-                <FormField id="info-linkedinUrl" label="LinkedIn (optional)" error={err('roleInfo.linkedinUrl')}>
-                  <Input id="info-linkedinUrl" value={info.linkedinUrl} onChange={(e) => setField('linkedinUrl', e.target.value)} inputMode="url" placeholder="https://www.linkedin.com/in/…" />
-                </FormField>
-              </>
-            )}
-          </motion.div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField id="phone" label="Mobile number" error={err('phone')}>
+            <Input id="phone" type="tel" inputMode="tel" autoComplete="tel" required placeholder="+91 98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={20} aria-invalid={Boolean(err('phone')) || undefined} />
+          </FormField>
+          <FormField id="dateOfBirth" label="Date of birth" error={err('dateOfBirth')} hint={age !== null && age >= 0 && age <= 100 ? `Age: ${age}` : undefined}>
+            <Input id="dateOfBirth" type="date" autoComplete="bday" required max={today} value={dob} onChange={(e) => setDob(e.target.value)} aria-invalid={Boolean(err('dateOfBirth')) || undefined} />
+          </FormField>
+        </div>
+        <p className="font-sans -mt-1 text-[12px] text-text-3">Your mobile number and date of birth stay private. They are never shown on your profile.</p>
 
         <FormField id="password" label="Password" error={err('password')}>
           <PasswordInput id="password" autoComplete="new-password" required value={password} onChange={(e) => setPassword(e.target.value)} invalid={Boolean(err('password'))} aria-describedby="password-hints" />
@@ -267,15 +240,26 @@ export default function RegisterPage() {
           <PasswordInput id="confirm" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} invalid={Boolean(err('confirm'))} />
         </FormField>
 
+        {needsCollege && (
+          <FormField id="collegeId" label="Your college" error={err('collegeId')}>
+            <Select id="collegeId" value={collegeId} onChange={(e) => setCollegeId(e.target.value)} disabled={colleges.loading} aria-invalid={Boolean(err('collegeId')) || undefined}>
+              <option value="">{colleges.loading ? 'Loading colleges…' : 'Choose your college'}</option>
+              {collegeList.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.city ? `, ${c.city}` : ''}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        )}
+
         <fieldset className="space-y-3 pt-1">
           <legend className="sr-only">Agreements</legend>
           <Checkbox id="acceptTerms" checked={terms} onChange={setTerms} error={err('acceptTerms')}>
             I agree to the{' '}
             <Link href="/terms" target="_blank" className="font-semibold text-accent hover:underline">Terms of service</Link> and have read the{' '}
             <Link href="/privacy" target="_blank" className="font-semibold text-accent hover:underline">Privacy policy</Link>.
-          </Checkbox>
-          <Checkbox id="confirmAdult" checked={adult} onChange={setAdult} error={err('confirmAdult')}>
-            I am 18 or older.
           </Checkbox>
           <Checkbox id="marketing" checked={marketing} onChange={setMarketing}>
             Send me occasional emails about new features. <span className="text-text-3">Optional; unsubscribe any time.</span>

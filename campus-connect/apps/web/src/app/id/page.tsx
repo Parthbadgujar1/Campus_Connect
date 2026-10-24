@@ -36,8 +36,8 @@ export default function CampusCardPage() {
         <div className="relative mt-2 overflow-hidden rounded-3xl bg-[#22377f] p-5 text-white shadow-xl">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-widest text-white/70">{user.college.shortName} · CampusConnect</p>
-              <p className="mt-1 truncate text-[16px] font-bold leading-tight">{user.college.name}</p>
+              <p className="text-xs font-semibold uppercase tracking-widest text-white/70">{user.role === 'expert' ? 'Industry expert' : user.college.shortName} · CampusConnect</p>
+              <p className="mt-1 truncate text-[16px] font-bold leading-tight">{user.role === 'expert' ? 'CampusConnect mentor network' : user.college.name}</p>
             </div>
             {user.profile.isVerified && (
               <Badge className="bg-white/15 text-white" icon={<BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />}>

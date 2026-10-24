@@ -338,13 +338,28 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
         tags: ['chats'],
         summary: 'Messages: newest page, older with ?before, catch up with ?after',
         params: idParam,
-        querystring: z.object({ before: z.string().max(200).optional(), after: z.string().max(200).optional(), limit: z.coerce.number().int().min(1).max(100).default(40) }),
+        querystring: z.object({
+          before: z.string().max(200).optional(),
+          after: z.string().max(200).optional(),
+          limit: z.coerce.number().int().min(1).max(100).default(40),
+          // Search this chat's messages (newest matches first, up to the limit).
+          q: z.string().trim().min(2).max(80).optional(),
+        }),
       },
     },
     async (request) => {
       const auth = requireAuth(request);
       const m = await requireMember(db, auth.userId, request.params.id);
-      const { before, after, limit } = request.query;
+      const { before, after, limit, q } = request.query;
+      if (q) {
+        const pattern = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const found = await messages()
+          .find({ $and: [{ chatId: m.chatId, deletedAt: null, body: { $regex: pattern, $options: 'i' } }, visibleSince(m)] })
+          .sort({ createdAt: -1, _id: -1 })
+          .limit(limit)
+          .toArray();
+        return { items: await toMessageViews(app.deps, auth.userId, m.chat, found), olderCursor: null, newerCursor: null, hasMoreNewer: false };
+      }
       const b = decodeCursor(before);
       const a = decodeCursor(after);
       const and: Filter<Message>[] = [{ chatId: m.chatId }, visibleSince(m)];
@@ -451,6 +466,58 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
     const m = await requireMember(db, auth.userId, row.chatId);
     return { row, m };
   }
+
+  // Forward a message to up to 5 chats, like WhatsApp. The copy keeps the text, photo or file
+  // and is marked "Forwarded". View-once snaps, plans and polls cannot be forwarded.
+  app.post(
+    '/messages/:id/forward',
+    { config: { rateLimit: { max: 60, timeWindow: '1 hour' } }, schema: { tags: ['chats'], summary: 'Forward a message to other chats', params: idParam, body: z.object({ chatIds: z.array(uuid).min(1).max(5) }) } },
+    async (request) => {
+      const auth = requireAuth(request);
+      const { row } = await loadMessage(auth, request.params.id);
+      if (row.deletedAt || !['text', 'image', 'file', 'voice', 'video'].includes(row.kind)) throw Errors.badRequest('This message cannot be forwarded.');
+      let sent = 0;
+      for (const chatId of [...new Set(request.body.chatIds)]) {
+        const target = await requireMember(db, auth.userId, chatId);
+        if (target.onlyAdminsPost && target.role === 'member') continue;
+        const otherId = otherInDirect(target, auth.userId);
+        if (otherId && (await isBlockedBetween(db, auth.userId, otherId))) continue;
+        const now = new Date();
+        const copy: Message = { _id: uuidv7(), chatId: target.chatId, senderId: auth.userId, kind: row.kind, body: row.body, replyToId: null, fileId: row.fileId, payload: {}, clientId: null, forwarded: true, editedAt: null, deletedAt: null, createdAt: now };
+        await messages().insertOne(copy);
+        await Promise.all([
+          chats().updateOne({ _id: target.chatId }, { $max: { lastMessageAt: now } }),
+          members().updateOne({ _id: target.member._id }, { $max: { lastReadAt: now } }),
+        ]);
+        const [view] = await toMessageViews(app.deps, auth.userId, target.chat, [copy]);
+        realtime.toChat(target.chatId, { type: 'message.created', chatId: target.chatId, message: { ...view, isMine: false } }, auth.userId);
+        if (otherId) await app.deps.notifier.send({ userId: otherId, kind: 'message', title: `${auth.displayName} forwarded a message`, body: copy.body?.slice(0, 140) ?? '', link: `/chats/${target.chatId}`, actorId: auth.userId, entityType: 'chat', entityId: target.chatId });
+        sent++;
+      }
+      return { sent };
+    },
+  );
+
+  // Group admins can make others admins (or take it back); the owner cannot be changed here.
+  app.patch(
+    '/chats/:id/members/:userId',
+    { schema: { tags: ['chats'], summary: 'Make someone a group admin, or a member again', params: z.object({ id: uuid, userId: uuid }), body: z.object({ role: z.enum(['admin', 'member']) }) } },
+    async (request) => {
+      const auth = requireAuth(request);
+      const m = await requireMember(db, auth.userId, request.params.id);
+      if (m.kind === 'direct') throw Errors.badRequest('Direct chats have no admins.');
+      if (m.role === 'member') throw Errors.forbidden('Only group admins can change roles.');
+      const target = await members().findOne({ _id: memberKey(m.chatId, request.params.userId) });
+      if (!target) throw Errors.notFound('This member');
+      if (target.role === 'owner') throw Errors.forbidden('The owner stays the owner.');
+      await members().updateOne({ _id: target._id }, { $set: { role: request.body.role } });
+      const people = await loadPeople(app.deps, [target.userId]);
+      const name = people.get(target.userId)?.displayName ?? 'Someone';
+      await postSystemMessage(app.deps, m.chatId, request.body.role === 'admin' ? `${auth.displayName} made ${name} an admin.` : `${auth.displayName} removed ${name} as admin.`);
+      realtime.toChat(m.chatId, { type: 'chat.updated', chatId: m.chatId });
+      return { status: 'saved' };
+    },
+  );
 
   app.patch('/messages/:id', { schema: { tags: ['chats'], summary: 'Edit my text message (15 minutes)', params: idParam, body: z.object({ body: text(1, 4000) }) } }, async (request) => {
     const auth = requireAuth(request);

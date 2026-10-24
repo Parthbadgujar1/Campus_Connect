@@ -34,6 +34,7 @@ export const FLAG_DEFAULTS: Record<string, { enabled: boolean; description: stri
   'module.registration': { enabled: true, description: 'New account sign-ups' },
   'module.feed': { enabled: true, description: 'Home feed, posts, comments and polls' },
   'module.chats': { enabled: true, description: 'Chats and messages' },
+  'module.status': { enabled: true, description: 'Status updates (24 hours)' },
   'module.realtime': { enabled: true, description: 'Live updates over WebSockets' },
   'module.spaces': { enabled: true, description: 'Spaces, boards and threads' },
   'module.events': { enabled: true, description: 'Events and RSVPs' },

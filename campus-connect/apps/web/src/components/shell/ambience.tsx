@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BookOpen, Moon, Sun, SunMoon } from 'lucide-react';
+import { BookOpen, Moon, PenLine, Sparkles, SunMoon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Sheet } from '@/components/ui/sheet';
 import { Segmented } from '@/components/ui/chip';
@@ -20,9 +20,10 @@ interface ThemeOption {
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
-  { value: 'system', label: 'Auto', hint: 'Follows your device', icon: SunMoon, swatch: ['linear-gradient(135deg,#ffffff 50%,#13112a 50%)', '#ffffff', '#2563eb'] },
-  { value: 'day', label: 'Day', hint: 'Light and clear', icon: Sun, swatch: ['#ffffff', '#f8fafc', '#2563eb'] },
-  { value: 'night', label: 'Night', hint: 'Deep and restful', icon: Moon, swatch: ['#13112a', '#1c1939', '#b8f28b'] },
+  { value: 'system', label: 'Auto', hint: 'Pro by day, Night after dark', icon: SunMoon, swatch: ['linear-gradient(135deg,#f6f4ff 50%,#13112a 50%)', '#ffffff', '#302675'] },
+  { value: 'pro', label: 'Pro', hint: 'The CampusConnect look: crisp and bold', icon: Sparkles, swatch: ['#f6f4ff', '#302675', '#b8f28b'] },
+  { value: 'day', label: 'Doodle', hint: 'Notebook paper, stickers and highlighters', icon: PenLine, swatch: ['#fffdf5', '#e9defd', '#b8f28b'] },
+  { value: 'night', label: 'Night', hint: 'Pro after dark, deep and restful', icon: Moon, swatch: ['#13112a', '#1c1939', '#b8f28b'] },
   { value: 'paper', label: 'Paper', hint: 'Reading mode, warm and still', icon: BookOpen, swatch: ['#f4eee2', '#fcf9f2', '#8a5a3b'] },
 ];
 
@@ -35,8 +36,9 @@ export interface FontOption {
 }
 
 export const FONT_OPTIONS: FontOption[] = [
-  { value: 'handwritten', label: 'Kalam', hint: 'The CampusConnect look', family: 'var(--font-kalam), cursive' },
-  { value: 'system', label: 'System default', hint: 'Your device’s own font', family: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
+  { value: 'pro', label: 'Pro', hint: 'Sharp and modern. The default', family: 'var(--font-pro), system-ui, sans-serif' },
+  { value: 'handwritten', label: 'Doodle', hint: 'Handwritten, like margin notes', family: 'var(--font-kalam), "Segoe Print", cursive' },
+  { value: 'system', label: 'General', hint: 'Your device’s own font', family: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' },
   { value: 'readable', label: 'Easy to read', hint: 'For low vision and dyslexia', family: 'var(--font-atkinson), system-ui, sans-serif' },
 ];
 

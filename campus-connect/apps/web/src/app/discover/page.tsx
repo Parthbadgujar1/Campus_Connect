@@ -46,7 +46,7 @@ export default function DiscoverPage() {
       <header className="pt-safe flex items-start justify-between gap-4 pt-6 md:pt-10">
         <Reveal>
           <h1 className="marker-heading hl-violet text-[30px] font-bold leading-tight tracking-tight md:text-[32px]">Discover</h1>
-          <p className="mt-1 text-[14px] text-text-3">{new Date().toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })} at {user?.college.shortName}</p>
+          <p className="mt-1 text-[14px] text-text-3">{new Date().toLocaleDateString('en-IN', { weekday: 'long', timeZone: 'Asia/Kolkata' })}{user && user.role !== 'expert' ? ` at ${user.college.shortName}` : ''}</p>
         </Reveal>
         <span className="md:hidden">
           <AmbienceButton />

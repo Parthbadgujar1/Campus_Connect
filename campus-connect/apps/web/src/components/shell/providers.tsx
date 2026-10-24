@@ -17,7 +17,7 @@ function AmbienceSync() {
     const root = document.documentElement;
     const query = window.matchMedia('(prefers-color-scheme: dark)');
     const apply = () => {
-      const resolved = theme === 'system' ? (query.matches ? 'night' : 'day') : theme;
+      const resolved = theme === 'system' ? (query.matches ? 'night' : 'pro') : theme;
       root.dataset.theme = resolved;
       root.dataset.mode = resolved === 'night' ? 'dark' : 'light';
     };

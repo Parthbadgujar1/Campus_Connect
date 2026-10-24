@@ -130,9 +130,9 @@ const studentSignup = (email: string, password: string, displayName: string, ext
   password,
   displayName,
   role: 'student',
-  roleInfo: { enrollmentNumber: `SMOKE${Math.floor(Math.random() * 1e6)}`, admissionYear: 2025 },
+  phone: '+91 98765 43210',
+  dateOfBirth: '2004-06-15',
   acceptTerms: true,
-  confirmAdult: true,
   ...extra,
 });
 
@@ -215,10 +215,11 @@ async function main() {
   check('terms must be accepted', noTerms.status === 400 && noTerms.body.error.details?.[0]?.field === 'acceptTerms', noTerms.body);
   const weak = await anon.post('/v1/auth/register', studentSignup('x2@example.org', 'password123', 'X Two'));
   check('weak passwords are refused with reasons', weak.status === 422 && weak.body.error.code === 'WEAK_PASSWORD', weak.body);
-  const noPrn = await anon.post('/v1/auth/register', { ...studentSignup('x3@example.org', 'a-long-pass-phrase-9', 'X Three'), roleInfo: {} });
-  check('students are asked for their enrolment number', noPrn.status === 400 && noPrn.body.error.details?.some((d: any) => d.field === 'roleInfo.enrollmentNumber'), noPrn.body);
-  const noOrg = await anon.post('/v1/auth/register', { ...studentSignup('x4@example.org', 'a-long-pass-phrase-9', 'X Four'), role: 'expert', roleInfo: { designation: 'Engineer' } });
-  check('experts are asked for their organisation', noOrg.status === 400 && noOrg.body.error.details?.some((d: any) => d.field === 'roleInfo.organization'), noOrg.body);
+  const young = new Date(Date.now() - 16 * 365.25 * 86_400_000).toISOString().slice(0, 10);
+  const minor = await anon.post('/v1/auth/register', { ...studentSignup('x3@example.org', 'a-long-pass-phrase-9', 'X Three'), dateOfBirth: young });
+  check('the age comes from the date of birth (under 18 is refused)', minor.status === 400 && minor.body.error.details?.some((d: any) => d.field === 'dateOfBirth'), minor.body);
+  const badPhone = await anon.post('/v1/auth/register', { ...studentSignup('x4@example.org', 'a-long-pass-phrase-9', 'X Four'), phone: '12345' });
+  check('a mobile number is required', badPhone.status === 400 && badPhone.body.error.details?.some((d: any) => d.field === 'phone'), badPhone.body);
 
   const newEmail = `smoke.${Date.now()}@example.org`;
   const since = new Date(Date.now() - 5_000);
@@ -277,7 +278,7 @@ async function signedIn(email: string): Promise<Client> {
 }
 
 /** Registers and verifies a brand-new account through the real email flow. */
-async function newAccount(name: string, signup: Record<string, unknown> = {}): Promise<{ client: Client; email: string; password: string }> {
+async function newAccount(name: string, signup: Record<string, unknown> = {}): Promise<{ client: Client; email: string; password: string; verify: Res }> {
   const email = `${name}.${run}@example.org`;
   const password = `smoke-${run}-pass-2026`;
   const since = new Date(Date.now() - 5_000);
@@ -285,8 +286,8 @@ async function newAccount(name: string, signup: Record<string, unknown> = {}): P
   await anon.post('/v1/auth/register', { ...studentSignup(email, password, `Smoke ${name}`), ...signup });
   const token = tokenIn(await latestEmail(email, 'verify_email', since));
   const client = new Client(email);
-  await client.post('/v1/auth/verify-email', { token });
-  return { client, email, password };
+  const verify = await client.post('/v1/auth/verify-email', { token });
+  return { client, email, password, verify };
 }
 
 async function upload(c: Client, purpose: string, name: string, bytes: Buffer, type: string): Promise<Res> {
@@ -337,23 +338,25 @@ async function moduleChecks({ riya, anon }: { riya: Client; anon: Client }): Pro
   section('Roles at sign-in');
   const roles = await Promise.all([riya, faculty, expert, moderator, admin].map(me));
   check('each seeded person signs in with their role', roles.map((r) => r.role).join(',') === 'student,faculty,expert,moderator,admin', roles.map((r) => r.role));
-  const pendingFaculty = await signedIn(EMAIL.pendingFaculty);
-  const pf = await me(pendingFaculty);
-  check('a faculty sign-up waits for approval (student access meanwhile)', pf.role === 'student' && pf.pendingRole === 'faculty', pf);
-  check('and cannot publish notices yet', (await pendingFaculty.post('/v1/announcements', { title: 'Not yet', body: 'x' })).status === 403);
+  const notYet = await new Client('pending-faculty').login(EMAIL.pendingFaculty);
+  check('a faculty sign-up cannot sign in until an admin approves', notYet.status === 403 && notYet.body.error.code === 'APPROVAL_PENDING', notYet.body);
   const roleQueue = await admin.get('/v1/admin/verifications?kind=faculty_role');
   const meenalReq = roleQueue.body.items?.find((v: any) => v.person.username === 'meenal.rao');
-  check('admins see role requests with the details given at sign-up', Boolean(meenalReq) && meenalReq.roleInfo?.employeeId === 'CSMSS-F-0466', meenalReq);
+  check('admins see role requests with who is asking', Boolean(meenalReq) && meenalReq.email === EMAIL.pendingFaculty && 'phone' in meenalReq && 'age' in meenalReq, meenalReq);
   check('moderators cannot grant faculty access', (await moderator.post(`/v1/admin/verifications/${meenalReq?.id}/decision`, { decision: 'approve' })).status === 403);
   const granted = await admin.post(`/v1/admin/verifications/${meenalReq?.id}/decision`, { decision: 'approve' });
-  const pfAfter = await me(pendingFaculty);
-  check('approving makes them faculty right away', granted.status === 200 && pfAfter.role === 'faculty' && pfAfter.pendingRole === null, pfAfter);
-  const facultySignup = await newAccount('newfaculty', { role: 'faculty', roleInfo: { employeeId: `CSMSS-F-${run.slice(-4)}`, designation: 'Assistant Professor' } });
-  const nf = await me(facultySignup.client);
-  check('signing up as faculty records the request', nf.role === 'student' && nf.pendingRole === 'faculty', nf);
-  const expertSignup = await newAccount('newexpert', { role: 'expert', roleInfo: { organization: 'Infosys', designation: 'Engineering Manager' } });
-  const ne = await me(expertSignup.client);
-  check('experts join with any email and wait for approval', ne.role === 'student' && ne.pendingRole === 'expert' && ne.email.endsWith('@example.org'), ne);
+  const pfAfter = await me(await signedIn(EMAIL.pendingFaculty));
+  check('once approved they sign in as faculty', granted.status === 200 && pfAfter.role === 'faculty' && pfAfter.pendingRole === null, pfAfter);
+  const facultySignup = await newAccount('newfaculty', { role: 'faculty' });
+  check('a new faculty sign-up confirms the email but waits for approval', facultySignup.verify.status === 202 && facultySignup.verify.body.status === 'approval_pending', facultySignup.verify.body);
+  const nfLogin = await new Client('nf').login(facultySignup.email, facultySignup.password);
+  check('and cannot sign in yet', nfLogin.status === 403 && nfLogin.body.error.code === 'APPROVAL_PENDING', nfLogin.body);
+  const expertSignup = await newAccount('newexpert', { role: 'expert' });
+  check('experts join with any email and wait for approval too', expertSignup.verify.body.status === 'approval_pending', expertSignup.verify.body);
+  const expertReq = (await admin.get('/v1/admin/verifications?kind=expert_role')).body.items?.find((v: any) => v.email === expertSignup.email);
+  const rejected = await admin.post(`/v1/admin/verifications/${expertReq?.id}/decision`, { decision: 'reject', note: 'Could not confirm' });
+  const rejLogin = await new Client('rej').login(expertSignup.email, expertSignup.password);
+  check('a rejected sign-up stays closed', rejected.status === 200 && rejLogin.status === 403 && rejLogin.body.error.code === 'ACCOUNT_SUSPENDED', rejLogin.body);
 
   // ---------------------------------------------------------------- people & settings
   section('People, profile and settings');

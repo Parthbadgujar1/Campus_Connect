@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Ban, Bookmark, ExternalLink, Flag, Lock, MessageCircle, MoreHorizontal, PenLine, Settings, Share2, UserCheck, UserPlus } from 'lucide-react';
+import { Ban, Bookmark, Clapperboard, ExternalLink, Flag, Lock, MessageCircle, MoreHorizontal, PenLine, Play, Settings, Share2, UserCheck, UserPlus } from 'lucide-react';
 import { LivePostCard } from '@/components/feed/live-post-card';
 import { ReportSheet } from '@/components/common/report-sheet';
 import { VerifiedMark } from '@/components/ui/avatar';
@@ -51,7 +51,7 @@ interface Profile {
 const ROLE_LABEL: Record<string, string> = { student: 'Student', faculty: 'Faculty', expert: 'Industry expert', moderator: 'Moderator', admin: 'Campus office' };
 const LINK_LABEL: Record<string, string> = { github: 'GitHub', linkedin: 'LinkedIn', portfolio: 'Portfolio', leetcode: 'LeetCode', twitter: 'X / Twitter', instagram: 'Instagram' };
 
-type Tab = 'posts' | 'about' | 'saved';
+type Tab = 'posts' | 'loops' | 'about' | 'saved';
 
 function Posts({ authorId }: { authorId: string }) {
   const feed = useInfinite<PostView>(`feed:author:${authorId}`, async (cursor, signal) => {
@@ -66,6 +66,36 @@ function Posts({ authorId }: { authorId: string }) {
       {feed.items.map((p) => (
         <LivePostCard key={p.id} post={p} onChange={(np) => feed.setItems((all) => all.map((x) => (x.id === np.id ? np : x)))} onRemove={(id) => feed.setItems((all) => all.filter((x) => x.id !== id))} />
       ))}
+      <LoadMore hasMore={feed.hasMore} loading={feed.loadingMore} onClick={feed.loadMore} />
+    </div>
+  );
+}
+
+/** Their loops as a 9:16 grid with view counts, like Reels on a profile. Tap opens Loops there. */
+function LoopsGrid({ authorId, isSelf }: { authorId: string; isSelf: boolean }) {
+  const feed = useInfinite<PostView>(`feed:loops:author:${authorId}`, (cursor, signal) => get<{ items: PostView[]; nextCursor: string | null }>('/feed', { scope: 'loops', authorId, cursor: cursor ?? undefined, limit: 18 }, signal));
+  if (feed.loading) return <SkeletonList variant="card" count={2} />;
+  if (feed.error && !feed.items.length) return <ErrorState error={feed.error} onRetry={feed.reload} />;
+  if (!feed.items.length) return <EmptyState icon={Clapperboard} title="No loops yet" description={isSelf ? 'Share a short video from Loops.' : undefined} action={isSelf ? <Link href="/loops" className={buttonClass({ size: 'sm' })}>Open Loops</Link> : undefined} />;
+  return (
+    <div>
+      <div className="grid grid-cols-3 gap-1 overflow-hidden rounded-2xl">
+        {feed.items.map((p) => {
+          const clip = p.attachments.find((a) => a.kind === 'video' && a.url);
+          const cover = p.cover?.thumbnailUrl ?? p.cover?.url;
+          return (
+            <Link key={p.id} href={`/loops?id=${p.id}`} className="group relative block aspect-[9/16] bg-black" aria-label={p.body ? p.body.slice(0, 80) : 'Loop'}>
+              {cover ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={cover} alt="" loading="lazy" className="h-full w-full object-cover transition-opacity group-hover:opacity-85" />
+              ) : clip?.url ? (
+                <video src={`${clip.url}#t=0.5`} preload="metadata" muted playsInline className="pointer-events-none h-full w-full object-cover" />
+              ) : null}
+              <span className="absolute bottom-1.5 left-2 flex items-center gap-1 text-[12px] font-semibold text-white drop-shadow"><Play className="h-3.5 w-3.5 fill-white" aria-hidden="true" />{p.viewsCount}</span>
+            </Link>
+          );
+        })}
+      </div>
       <LoadMore hasMore={feed.hasMore} loading={feed.loadingMore} onClick={feed.loadMore} />
     </div>
   );
@@ -211,6 +241,7 @@ export function LiveProfile({ handle }: { handle: string }) {
 
   const tabs: Array<{ value: Tab; label: string }> = [
     { value: 'posts', label: `Posts${p.postsCount ? ` · ${p.postsCount}` : ''}` },
+    { value: 'loops', label: 'Loops' },
     { value: 'about', label: 'About' },
     ...(p.isSelf ? [{ value: 'saved' as Tab, label: 'Saved' }] : []),
   ];
@@ -286,6 +317,7 @@ export function LiveProfile({ handle }: { handle: string }) {
           <UnderlineTabs<Tab> className="mt-8" label="Profile sections" value={tab} onChange={setTab} options={tabs} />
           <div className={cn('mt-5')}>
             {tab === 'posts' && <Posts authorId={p.id} />}
+            {tab === 'loops' && <LoopsGrid authorId={p.id} isSelf={p.isSelf} />}
             {tab === 'about' && <About p={p} />}
             {tab === 'saved' && p.isSelf && <Saved />}
           </div>

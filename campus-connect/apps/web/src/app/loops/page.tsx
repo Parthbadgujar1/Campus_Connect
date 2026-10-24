@@ -1,191 +1,98 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Bookmark, CheckCircle2, Clapperboard, Heart, MessageCircle, Plus, RotateCcw, Send, Volume2, VolumeX } from 'lucide-react';
-import { del, errorMessage, get, put } from '@/lib/api/client';
-import { useInfinite, type Page } from '@/lib/api/hooks';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Camera, CheckCircle2, ChevronDown, ChevronUp, Clapperboard, RotateCcw, UsersRound } from 'lucide-react';
+import { errorMessage, get, withQuery } from '@/lib/api/client';
+import { useInfinite, useQuery, type Page } from '@/lib/api/hooks';
 import type { PostView } from '@/lib/api/types';
 import { buttonClass } from '@/components/ui/button';
-import { PersonAvatar } from '@/components/ui/person-avatar';
 import { Spinner } from '@/components/ui/states';
-import { useToast } from '@/components/ui/toast';
-import { AnimatePresence, motion } from '@/components/motion';
-import { ago } from '@/lib/live-time';
+import { LoopPlayer } from '@/components/loops/loop-player';
+import { NewLoop } from '@/components/loops/new-loop';
 import { cn } from '@/lib/utils';
 
-// Discover → Loops: every post with a video, one per screen. Swipe (or scroll) up for the next,
-// double-tap to like. The video in view plays; the rest pause. When there are no more loops,
-// a clear end card says so instead of repeating old ones.
+// Discover → Loops: short videos from people at your college, one per screen, like Reels.
+// Swipe or use ↑/↓ to move, tap for sound, hold to pause, double-tap to like. "For you" shows
+// every loop you can see, newest first; "Following" only people you follow; /loops?tag=x one
+// hashtag; /loops?id=x opens a shared loop first. When there are no more, an end card says so.
 
-function compact(n: number) {
-  return n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}k` : String(n);
-}
+type Tab = 'for-you' | 'following';
+const isLoop = (p: PostView) => p.attachments.some((a) => a.kind === 'video' && a.url);
 
-function Loop({ post, muted, onMute, onChange }: { post: PostView; muted: boolean; onMute: () => void; onChange: (p: PostView) => void }) {
-  const toast = useToast();
-  const root = useRef<HTMLElement | null>(null);
-  const video = useRef<HTMLVideoElement | null>(null);
-  const [bursts, setBursts] = useState<Array<{ id: number; x: number; y: number }>>([]);
-  const [paused, setPaused] = useState(false);
-  const lastTap = useRef(0);
-  const clip = post.attachments.find((a) => a.kind === 'video' && a.url);
-
-  // Play only while most of the loop is on screen.
-  useEffect(() => {
-    const el = root.current;
-    const v = video.current;
-    if (!el || !v) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting && entry.intersectionRatio > 0.6) {
-          v.play().then(() => setPaused(false)).catch(() => setPaused(true));
-        } else {
-          v.pause();
-        }
-      },
-      { threshold: [0, 0.6, 1] },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const like = async (force?: boolean) => {
-    const next = force ?? !post.liked;
-    if (next === post.liked) return;
-    onChange({ ...post, liked: next, likesCount: post.likesCount + (next ? 1 : -1) });
-    try {
-      const r = await (next ? put<{ likesCount: number }>(`/posts/${post.id}/like`) : del<{ likesCount: number }>(`/posts/${post.id}/like`));
-      onChange({ ...post, liked: next, likesCount: r.likesCount });
-    } catch (err) {
-      onChange(post);
-      toast(errorMessage(err));
-    }
-  };
-  const save = async () => {
-    const next = !post.saved;
-    onChange({ ...post, saved: next });
-    try {
-      await (next ? put(`/saved/post/${post.id}`) : del(`/saved/post/${post.id}`));
-      toast(next ? 'Saved' : 'Removed from saved');
-    } catch (err) {
-      onChange(post);
-      toast(errorMessage(err));
-    }
-  };
-  const share = async () => {
-    const url = `${window.location.origin}/post/${post.id}`;
-    try {
-      if (navigator.share) await navigator.share({ title: 'A loop on CampusConnect', url });
-      else {
-        await navigator.clipboard.writeText(url);
-        toast('Link copied');
-      }
-    } catch {
-      // Share sheet closed.
-    }
-  };
-  const onTap = (e: React.MouseEvent<HTMLDivElement>) => {
-    const now = Date.now();
-    if (now - lastTap.current < 300) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const id = now;
-      setBursts((b) => [...b, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
-      setTimeout(() => setBursts((b) => b.filter((x) => x.id !== id)), 800);
-      void like(true);
-    } else {
-      const v = video.current;
-      if (v) {
-        if (v.paused) void v.play().then(() => setPaused(false)).catch(() => undefined);
-        else {
-          v.pause();
-          setPaused(true);
-        }
-      }
-    }
-    lastTap.current = now;
-  };
-
-  return (
-    <section ref={root} className="relative h-dvh w-full snap-start snap-always overflow-hidden bg-black text-white" aria-label={`Loop by ${post.author?.displayName ?? 'Anonymous'}`}>
-      {clip?.url && (
-        <video ref={video} src={clip.url} poster={clip.thumbnailUrl ?? undefined} muted={muted} loop playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
-      )}
-      <div className="absolute inset-0" onClick={onTap} aria-hidden="true" />
-      <AnimatePresence>
-        {paused && (
-          <motion.span initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="pointer-events-none absolute left-1/2 top-1/2 grid h-16 w-16 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/50 text-[13px] font-semibold">
-            Paused
-          </motion.span>
-        )}
-      </AnimatePresence>
-      {bursts.map((b) => (
-        <motion.span key={b.id} initial={{ opacity: 1, scale: 0.4 }} animate={{ opacity: 0, scale: 1.6, y: -40 }} transition={{ duration: 0.7 }} className="pointer-events-none absolute" style={{ left: b.x - 36, top: b.y - 36 }}>
-          <Heart className="h-[72px] w-[72px] fill-rose-500 text-rose-500 drop-shadow" aria-hidden="true" />
-        </motion.span>
-      ))}
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-black/80 to-transparent" />
-      <div className="absolute bottom-0 left-0 right-20 p-4 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
-        <div className="flex items-center gap-2">
-          {post.author ? (
-            <Link href={`/profile/${post.author.username}`} className="flex items-center gap-2 font-semibold">
-              <PersonAvatar person={post.author} size="sm" /> {post.author.displayName}
-            </Link>
-          ) : (
-            <span className="font-semibold">Anonymous</span>
-          )}
-          <span className="text-[13px] text-white/70">· {ago(post.createdAt)}</span>
-        </div>
-        {post.body && <p className="mt-2 line-clamp-3 text-[15px] text-white/95">{post.body}</p>}
-        {post.tags.length > 0 && <p className="mt-1 text-[13px] text-white/80">{post.tags.map((t) => `#${t}`).join(' ')}</p>}
-      </div>
-      <div className="absolute bottom-0 right-0 flex flex-col items-center gap-4 p-3 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-        <button type="button" onClick={() => void like()} aria-pressed={post.liked} aria-label={post.liked ? 'Unlike' : 'Like'} className="flex flex-col items-center gap-1 text-[12px] font-semibold">
-          <motion.span whileTap={{ scale: 0.8 }} className="grid h-12 w-12 place-items-center rounded-full bg-white/15 backdrop-blur"><Heart className={cn('h-6 w-6', post.liked && 'fill-rose-500 text-rose-500')} aria-hidden="true" /></motion.span>
-          {compact(post.likesCount)}
-        </button>
-        <Link href={`/post/${post.id}`} aria-label="Comments" className="flex flex-col items-center gap-1 text-[12px] font-semibold">
-          <span className="grid h-12 w-12 place-items-center rounded-full bg-white/15 backdrop-blur"><MessageCircle className="h-6 w-6" aria-hidden="true" /></span>
-          {compact(post.commentsCount)}
-        </Link>
-        <button type="button" onClick={() => void save()} aria-pressed={post.saved} aria-label={post.saved ? 'Remove from saved' : 'Save'} className="grid h-12 w-12 place-items-center rounded-full bg-white/15 backdrop-blur">
-          <Bookmark className={cn('h-6 w-6', post.saved && 'fill-white')} aria-hidden="true" />
-        </button>
-        <button type="button" onClick={() => void share()} aria-label="Share" className="grid h-12 w-12 place-items-center rounded-full bg-white/15 backdrop-blur">
-          <Send className="h-6 w-6" aria-hidden="true" />
-        </button>
-        <button type="button" onClick={onMute} aria-label={muted ? 'Turn sound on' : 'Mute'} className="grid h-12 w-12 place-items-center rounded-full bg-white/15 backdrop-blur">
-          {muted ? <VolumeX className="h-6 w-6" aria-hidden="true" /> : <Volume2 className="h-6 w-6" aria-hidden="true" />}
-        </button>
-      </div>
-    </section>
-  );
-}
-
-function EndCard({ empty, onTop }: { empty: boolean; onTop: () => void }) {
+function EndCard({ kind, onTop, onNew }: { kind: 'empty' | 'following-empty' | 'end'; onTop: () => void; onNew: () => void }) {
+  const copy = {
+    empty: { icon: Clapperboard, title: 'No loops yet', text: 'Loops are short videos from people at your college. Post the first one.' },
+    'following-empty': { icon: UsersRound, title: 'Nothing from people you follow', text: 'Follow people from their loops or profiles, and their new loops show up here.' },
+    end: { icon: CheckCircle2, title: 'You’re all caught up', text: 'You have seen every loop here. New ones appear as people post them.' },
+  }[kind];
   return (
     <section className="grid h-dvh w-full snap-start place-items-center bg-black px-8 text-center text-white">
       <div className="flex flex-col items-center gap-3">
-        <span className="grid h-16 w-16 place-items-center rounded-full bg-white/10">{empty ? <Clapperboard className="h-8 w-8" aria-hidden="true" /> : <CheckCircle2 className="h-8 w-8 text-emerald-400" aria-hidden="true" />}</span>
-        <p className="text-[22px] font-semibold">{empty ? 'No loops yet' : 'You’ve reached the end'}</p>
-        <p className="max-w-xs text-[14px] text-white/70">{empty ? 'Loops are short videos people post. Share one from your phone to get it started.' : 'You have watched every loop from your campus. New ones show up here as people post them.'}</p>
+        <span className="grid h-16 w-16 place-items-center rounded-full bg-white/10"><copy.icon className={cn('h-8 w-8', kind === 'end' && 'text-emerald-400')} aria-hidden="true" /></span>
+        <p className="text-[22px] font-semibold">{copy.title}</p>
+        <p className="max-w-xs text-[14px] text-white/70">{copy.text}</p>
         <div className="mt-2 flex gap-2">
-          <Link href="/create?video=1" className={buttonClass({ size: 'sm' })}><Plus className="h-4 w-4" aria-hidden="true" /> Post a loop</Link>
-          {!empty && <button type="button" onClick={onTop} className={buttonClass({ size: 'sm', variant: 'secondary' })}><RotateCcw className="h-4 w-4" aria-hidden="true" /> Back to top</button>}
+          <button type="button" onClick={onNew} className={buttonClass({ size: 'sm' })}><Camera className="h-4 w-4" aria-hidden="true" /> New loop</button>
+          {kind === 'end' && <button type="button" onClick={onTop} className={buttonClass({ size: 'sm', variant: 'secondary' })}><RotateCcw className="h-4 w-4" aria-hidden="true" /> Back to top</button>}
         </div>
       </div>
     </section>
   );
 }
 
-export default function LoopsPage() {
+function LoopsInner() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const tag = params.get('tag');
+  const startId = params.get('id');
+  const tab: Tab = params.get('tab') === 'following' ? 'following' : 'for-you';
   const [muted, setMuted] = useState(true);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [hidden, setHidden] = useState<string[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [mine, setMine] = useState<PostView[]>([]);
   const scroller = useRef<HTMLDivElement | null>(null);
   const sentinel = useRef<HTMLDivElement | null>(null);
-  const feed = useInfinite<PostView>('feed:loops', (cursor, signal) => get<Page<PostView>>('/feed', { scope: 'loops', cursor: cursor ?? undefined, limit: 6 }, signal));
-  const items = feed.items.filter((p) => p.attachments.some((a) => a.kind === 'video' && a.url));
 
+  const feed = useInfinite<PostView>(`feed:loops:${tab}:${tag ?? ''}`, (cursor, signal) =>
+    get<Page<PostView>>('/feed', { scope: 'loops', following: tab === 'following' ? 'true' : undefined, tag: tag ?? undefined, cursor: cursor ?? undefined, limit: 6 }, signal),
+  );
+  const first = useQuery<PostView>(startId ? `loops:one:${startId}` : null, (signal) => get(`/posts/${startId}`, undefined, signal));
+  const [edits, setEdits] = useState<Record<string, PostView>>({});
+
+  const items = useMemo(() => {
+    const seen = new Set<string>(hidden);
+    const out: PostView[] = [];
+    for (const p of [...mine, ...(first.data && isLoop(first.data) ? [first.data] : []), ...feed.items]) {
+      if (seen.has(p.id) || !isLoop(p)) continue;
+      seen.add(p.id);
+      out.push(edits[p.id] ?? p);
+    }
+    return out;
+  }, [mine, first.data, feed.items, hidden, edits]);
+
+  const activeIndex = Math.max(0, items.findIndex((p) => p.id === activeId));
+
+  // The loop that fills most of the screen is the one that plays.
+  useEffect(() => {
+    const root = scroller.current;
+    if (!root) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting && e.intersectionRatio >= 0.6) setActiveId((e.target as HTMLElement).dataset.loopId ?? null);
+      },
+      { root, threshold: [0.6] },
+    );
+    root.querySelectorAll('[data-loop-id]').forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [items.length]);
+  useEffect(() => {
+    if (!activeId && items[0]) setActiveId(items[0].id);
+  }, [activeId, items]);
+
+  // Load more before reaching the end.
   useEffect(() => {
     const el = sentinel.current;
     if (!el || !feed.hasMore) return;
@@ -194,16 +101,77 @@ export default function LoopsPage() {
     return () => observer.disconnect();
   }, [feed.hasMore, feed.loadMore, items.length]);
 
+  const go = useCallback((by: number) => {
+    const root = scroller.current;
+    if (!root) return;
+    root.scrollBy({ top: by * root.clientHeight, behavior: 'smooth' });
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof Element && e.target.closest('input, textarea, select, [role="dialog"]')) return;
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault();
+        go(1);
+      } else if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault();
+        go(-1);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [go]);
+
+  const setTab = (t: Tab) => router.replace(withQuery('/loops', { tab: t === 'following' ? 'following' : null }), { scroll: false });
+  const change = (p: PostView) => setEdits((m) => ({ ...m, [p.id]: p }));
+  const followAuthor = (authorId: string) =>
+    setEdits((m) => {
+      const next = { ...m };
+      for (const p of items) if (p.author?.id === authorId) next[p.id] = { ...(m[p.id] ?? p), followsAuthor: true };
+      return next;
+    });
+  const remove = (id: string) => {
+    const i = items.findIndex((p) => p.id === id);
+    setHidden((h) => [...h, id]);
+    setActiveId(items[i + 1]?.id ?? items[i - 1]?.id ?? null);
+  };
+
+  const loading = feed.loading && !items.length;
+  const endKind = !items.length ? (tab === 'following' && !tag ? 'following-empty' : 'empty') : 'end';
+
   return (
-    <div className="fixed inset-0 z-40 bg-black">
-      <Link href="/discover" aria-label="Back" className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 grid h-11 w-11 place-items-center rounded-full bg-black/40 text-white backdrop-blur">
-        <ArrowLeft className="h-5 w-5" aria-hidden="true" />
-      </Link>
-      <p className="pointer-events-none absolute left-1/2 top-[max(1.1rem,env(safe-area-inset-top))] z-10 -translate-x-1/2 text-[17px] font-semibold text-white">Loops</p>
-      <div ref={scroller} className="h-dvh snap-y snap-mandatory overflow-y-auto overscroll-contain">
-        {feed.loading && <div className="grid h-dvh place-items-center text-white"><Spinner label="Loading loops" /></div>}
+    <div className="fixed inset-0 z-40 bg-black text-white">
+      {/* Top bar */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 bg-gradient-to-b from-black/60 to-transparent pb-6 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <div className="pointer-events-auto mx-auto flex max-w-xl items-center gap-2 px-3">
+          <Link href={tag ? '/loops' : '/discover'} aria-label="Back" className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10"><ArrowLeft className="h-5 w-5" aria-hidden="true" /></Link>
+          {tag ? (
+            <p className="flex-1 truncate text-center text-[18px] font-semibold">#{tag}</p>
+          ) : (
+            <div className="flex flex-1 justify-center gap-5 text-[17px] font-semibold" role="tablist" aria-label="Loops">
+              {(['for-you', 'following'] as Tab[]).map((t) => (
+                <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn('relative pb-1 transition-opacity', tab === t ? 'opacity-100' : 'opacity-60 hover:opacity-90')}>
+                  {t === 'for-you' ? 'For you' : 'Following'}
+                  {tab === t && <span className="absolute inset-x-2 -bottom-0.5 h-0.5 rounded-full bg-white" />}
+                </button>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={() => setCreating(true)} aria-label="New loop" className="grid h-10 w-10 place-items-center rounded-full hover:bg-white/10"><Camera className="h-5 w-5" aria-hidden="true" /></button>
+        </div>
+      </div>
+
+      {/* Up / down on desktop */}
+      {items.length > 1 && (
+        <div className="absolute right-6 top-1/2 z-30 hidden -translate-y-1/2 flex-col gap-3 md:flex">
+          <button type="button" onClick={() => go(-1)} disabled={activeIndex === 0} aria-label="Previous loop" className="grid h-11 w-11 place-items-center rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30"><ChevronUp className="h-5 w-5" aria-hidden="true" /></button>
+          <button type="button" onClick={() => go(1)} aria-label="Next loop" className="grid h-11 w-11 place-items-center rounded-full bg-white/10 hover:bg-white/20"><ChevronDown className="h-5 w-5" aria-hidden="true" /></button>
+        </div>
+      )}
+
+      <div ref={scroller} className="no-scrollbar h-dvh snap-y snap-mandatory overflow-y-auto overscroll-contain">
+        {loading && <div className="grid h-dvh place-items-center"><Spinner label="Loading loops" /></div>}
         {feed.error && !items.length && (
-          <div className="grid h-dvh place-items-center px-8 text-center text-white">
+          <div className="grid h-dvh place-items-center px-8 text-center">
             <div>
               <p className="font-semibold">Loops could not load</p>
               <p className="mt-1 text-[14px] text-white/70">{errorMessage(feed.error)}</p>
@@ -211,12 +179,43 @@ export default function LoopsPage() {
             </div>
           </div>
         )}
-        {items.map((p) => (
-          <Loop key={p.id} post={p} muted={muted} onMute={() => setMuted((m) => !m)} onChange={(next) => feed.setItems((list) => list.map((x) => (x.id === next.id ? next : x)))} />
+        {items.map((p, i) => (
+          <LoopPlayer
+            key={p.id}
+            post={p}
+            active={p.id === (activeId ?? items[0]?.id)}
+            distance={Math.abs(i - activeIndex)}
+            muted={muted}
+            onMuteChange={setMuted}
+            onChange={change}
+            onFollowAuthor={followAuthor}
+            onRemove={remove}
+          />
         ))}
-        {feed.hasMore && <div ref={sentinel} className="grid h-24 place-items-center text-white">{feed.loadingMore && <Spinner />}</div>}
-        {!feed.loading && !feed.hasMore && !(feed.error && !items.length) && <EndCard empty={!items.length} onTop={() => scroller.current?.scrollTo({ top: 0, behavior: 'smooth' })} />}
+        {feed.hasMore && <div ref={sentinel} className="grid h-24 place-items-center">{feed.loadingMore && <Spinner />}</div>}
+        {!loading && !feed.hasMore && !(feed.error && !items.length) && <EndCard kind={endKind} onTop={() => scroller.current?.scrollTo({ top: 0, behavior: 'smooth' })} onNew={() => setCreating(true)} />}
       </div>
+
+      {creating && (
+        <NewLoop
+          onClose={() => setCreating(false)}
+          onPosted={(p) => {
+            setCreating(false);
+            setMine((m) => [p, ...m]);
+            setActiveId(p.id);
+            if (tag || tab === 'following') router.replace('/loops', { scroll: false });
+            requestAnimationFrame(() => scroller.current?.scrollTo({ top: 0 }));
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+export default function LoopsPage() {
+  return (
+    <Suspense fallback={<div className="fixed inset-0 z-40 grid place-items-center bg-black text-white"><Spinner label="Loading loops" /></div>}>
+      <LoopsInner />
+    </Suspense>
   );
 }

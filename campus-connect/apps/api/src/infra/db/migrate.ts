@@ -51,6 +51,15 @@ export async function applySchema(db: Db, log: (m: string) => void = () => undef
     const exists = (idx: (typeof spec.indexes)[number]) => (idx.options?.name ? haveNames.has(idx.options.name) : haveKeys.has(canonical(idx.key)));
     for (const idx of spec.indexes) {
       if (exists(idx)) continue;
+      // A named index replacing an older one on the same fields (for example to make it
+      // partial): drop the old one first, since MongoDB keeps one index per field list.
+      if (idx.options?.name) {
+        const old = have.find((i) => i.name !== '_id_' && i.name !== idx.options!.name && canonical(i.key) === canonical(idx.key));
+        if (old?.name) {
+          await col.dropIndex(old.name);
+          log(`replaced index ${spec.name}.${old.name}`);
+        }
+      }
       await col.createIndex(idx.key, idx.options ?? {});
       result.indexesCreated += 1;
       log(`index ${spec.name} ${JSON.stringify(idx.key)}`);

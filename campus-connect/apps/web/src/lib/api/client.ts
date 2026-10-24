@@ -163,6 +163,38 @@ export function upload<T>(purpose: string, file: File): Promise<T> {
   return api<T>(`/files?purpose=${encodeURIComponent(purpose)}`, { method: 'POST', body: form });
 }
 
+/** Uploads one file and reports progress (0–1) while it goes up; used for videos. */
+export function uploadWithProgress<T>(purpose: string, file: File | Blob, name: string, onProgress: (fraction: number) => void, signal?: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const form = new FormData();
+    form.append('file', file, name);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${BASE}/files?purpose=${encodeURIComponent(purpose)}`);
+    xhr.withCredentials = true;
+    xhr.setRequestHeader('accept', 'application/json');
+    const token = csrfToken();
+    if (token) xhr.setRequestHeader('x-csrf-token', token);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      let data: unknown = null;
+      try {
+        data = xhr.responseText ? JSON.parse(xhr.responseText) : null;
+      } catch {
+        data = null;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as T);
+      const envelope = (data as { error?: { code?: string; message?: string; details?: unknown; requestId?: string } } | null)?.error;
+      reject(envelope ? new ApiError(xhr.status, envelope.code ?? 'UNKNOWN', envelope.message ?? 'The upload failed. Please try again.', envelope.details, envelope.requestId) : new ApiError(xhr.status || 503, 'SERVICE_UNAVAILABLE', 'The upload failed. Please try again.'));
+    };
+    xhr.onerror = () => reject(new ApiError(0, 'NETWORK', 'The upload was interrupted. Check your connection and try again.'));
+    xhr.onabort = () => reject(new DOMException('Upload cancelled', 'AbortError'));
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true });
+    xhr.send(form);
+  });
+}
+
 /** A stable random id for idempotent sends (chat messages). */
 export function clientId(): string {
   const bytes = new Uint8Array(16);

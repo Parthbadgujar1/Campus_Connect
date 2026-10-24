@@ -9,6 +9,7 @@ import type { Deps } from './deps.js';
 import { modules } from './modules/index.js';
 import authPlugin from './plugins/auth.js';
 import errorHandler from './plugins/error-handler.js';
+import liveChanges from './plugins/live-changes.js';
 import { registerModule } from './plugins/module-guard.js';
 import security from './plugins/security.js';
 import traffic from './plugins/traffic.js';
@@ -77,6 +78,7 @@ export async function buildApp(deps: Deps): Promise<FastifyInstance> {
     await app.register(swaggerUi, { routePrefix: '/docs', staticCSP: true });
   }
 
+  await app.register(liveChanges);
   for (const def of modules) registerModule(app, def);
 
   return app;

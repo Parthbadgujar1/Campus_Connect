@@ -50,7 +50,7 @@ export interface Me {
     interests: string[];
     links: Record<string, string>;
     isVerified: boolean;
-    visibility: { profile?: 'campus' | 'connections'; showBranch?: boolean; showEmail?: boolean; showActivity?: boolean };
+    visibility: { profile?: 'campus' | 'connections'; showBranch?: boolean; showEmail?: boolean; showActivity?: boolean; showOnline?: boolean };
     messagePrivacy: 'everyone' | 'connections' | 'nobody';
     followersCount: number;
     followingCount: number;
@@ -63,8 +63,8 @@ export interface SessionPayload {
   csrfToken: string | null;
 }
 
-export type FontChoice = 'handwritten' | 'system' | 'readable';
-export type ThemeChoice = 'system' | 'day' | 'night' | 'paper';
+export type FontChoice = 'pro' | 'handwritten' | 'system' | 'readable';
+export type ThemeChoice = 'system' | 'pro' | 'day' | 'night' | 'paper';
 export type TextSizeChoice = 'sm' | 'md' | 'lg';
 
 export interface Settings {
@@ -105,8 +105,13 @@ export interface PostView {
   likesCount: number;
   commentsCount: number;
   savesCount: number;
+  viewsCount: number;
+  /** Cover image of a video post, if one was chosen. */
+  cover: FileView | null;
   liked: boolean;
   saved: boolean;
+  /** Whether I follow the author. */
+  followsAuthor: boolean;
   pinned: boolean;
   createdAt: string;
 }
@@ -245,6 +250,8 @@ export interface MessageView {
   reactions: Array<{ emoji: string; count: number; mine: boolean }>;
   responses: { counts: Record<string, number>; mine: string | null } | null;
   edited: boolean;
+  /** Sent on from another chat. */
+  forwarded: boolean;
   deleted: boolean;
   createdAt: string;
 }

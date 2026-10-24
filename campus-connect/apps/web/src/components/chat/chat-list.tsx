@@ -21,6 +21,7 @@ import { useLive } from '@/lib/realtime';
 import { refreshBadges } from '@/components/shell/app-shell';
 import { ago } from '@/lib/live-time';
 import { cn } from '@/lib/utils';
+import { StatusStrip } from '@/components/status/status';
 
 type Filter = 'all' | 'unread' | 'direct' | 'groups' | 'archived';
 
@@ -124,6 +125,7 @@ export function ChatList() {
           <h1 className="marker-heading hl-green text-[28px] font-bold leading-tight">Chats</h1>
           <Button size="sm" onClick={() => setComposing(true)}><MessageSquarePlus className="h-4 w-4" aria-hidden="true" /> New</Button>
         </div>
+        <StatusStrip />
         <form className="relative mt-3" onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()); }}>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-text-3" aria-hidden="true" />
           <Input value={q} onChange={(e) => { setQ(e.target.value); if (!e.target.value) setSearch(''); }} placeholder="Search chats" className="h-11 pl-10" aria-label="Search chats" enterKeyHint="search" />

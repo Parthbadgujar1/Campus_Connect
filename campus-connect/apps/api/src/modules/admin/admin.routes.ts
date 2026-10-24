@@ -7,7 +7,7 @@ import { Errors } from '../../core/errors.js';
 import { MODERATION_ROLES, requireRole, STAFF_ROLES } from '../../core/guards.js';
 import { decodeCursor, encodeCursor, page, pageQuery } from '../../core/pagination.js';
 import { contains, newerThan, olderThan } from '../../core/query.js';
-import { idParam, optionalText, text, uuid } from '../../core/validation.js';
+import { cleanText, idParam, optionalText, text, uuid } from '../../core/validation.js';
 import { uuidv7 } from '../../infra/db/ids.js';
 import type { AuditLog, ContactMessage, EmailOutbox, Role, User, VerificationRequest } from '../../infra/db/models.js';
 import { moduleHealth } from '../../plugins/module-guard.js';
@@ -15,6 +15,7 @@ import { FLAG_DEFAULTS } from '../flags/flags.service.js';
 import { completeExport } from '../privacy/privacy.service.js';
 import { applyTarget, lookupTarget, TARGET_TYPES, TARGETS, type TargetType } from '../reports/targets.js';
 import { departmentNames, loadPeople, personOf } from '../users/people.js';
+import { ageOn } from '../auth/auth.service.js';
 
 // /v1/admin — the admin console. Everything is limited to the admin's own college.
 //   admin      - everything
@@ -178,6 +179,8 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
       role: u.role,
       pendingRole: u.pendingRole,
       roleInfo: u.roleInfo ?? {},
+      phone: u.phone ?? null,
+      age: u.dateOfBirth ? ageOn(u.dateOfBirth, new Date()) : null,
       status: u.status,
       emailVerifiedAt: u.emailVerifiedAt?.toISOString() ?? null,
       joinedAt: u.createdAt.toISOString(),
@@ -244,10 +247,11 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
     const { items, nextCursor } = page(rows, request.query.limit, (r) => encodeCursor(r.createdAt, r._id));
     const [people, details, files] = await Promise.all([
       loadPeople(app.deps, items.map((r) => r.userId)),
-      users().find({ _id: { $in: items.map((r) => r.userId) } }, { projection: { email: 1, roleInfo: 1, pendingRole: 1 } }).toArray(),
+      users().find({ _id: { $in: items.map((r) => r.userId) } }, { projection: { email: 1, roleInfo: 1, pendingRole: 1, phone: 1, dateOfBirth: 1, collegeId: 1 } }).toArray(),
       db.col('files').find({ _id: { $in: items.map((r) => r.fileId).filter((x): x is string => Boolean(x)) }, status: 'ready' }).toArray(),
     ]);
     const detailBy = new Map(details.map((d) => [d._id, d]));
+    const collegeNames = new Map((await db.col('colleges').find({ _id: { $in: details.map((d) => d.collegeId) } }, { projection: { name: 1 } }).toArray()).map((c) => [c._id, c.name]));
     return {
       items: await Promise.all(
         items.map(async (r) => {
@@ -262,6 +266,9 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
             person: personOf(people, r.userId),
             // What they told us at sign-up, so the reviewer can check it.
             email: d?.email ?? null,
+            phone: d?.phone ?? null,
+            age: d?.dateOfBirth ? ageOn(d.dateOfBirth, new Date()) : null,
+            college: d ? (collegeNames.get(d.collegeId) ?? null) : null,
             roleInfo: d?.roleInfo ?? {},
             documentUrl: f ? await app.deps.storage.signedUrl({ id: f._id, storageKey: f.storageKey, originalName: f.originalName, mimeType: f.mimeType }, 'original', 600) : null,
             createdAt: r.createdAt.toISOString(),
@@ -287,9 +294,11 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
         await db.col('verification_requests').updateOne({ _id: pending._id }, { $set: { status: approve ? 'approved' : 'rejected', reviewerId: auth.userId, reviewerNote: request.body.note ?? null, reviewedAt: now, updatedAt: now } }, { session });
         if (approve && pending.kind === 'student_id') await users().updateOne({ _id: pending.userId }, { $set: { 'profile.isVerified': true } }, { session });
         if (roleRequest) {
-          // Approved: the requested role. Rejected: the account stays a student account.
+          // Approved: the requested role, and they can sign in. Rejected: the sign-up is closed
+          // (it never had access), so someone posing as faculty cannot get in.
           const set: Document = { pendingRole: null, updatedAt: now };
           if (approve) Object.assign(set, { role: pending.kind === 'faculty_role' ? 'faculty' : 'expert', 'profile.isVerified': true });
+          else Object.assign(set, { status: 'suspended' });
           await users().updateOne({ _id: pending.userId }, { $set: set }, { session });
         }
         const u = await users().findOne({ _id: pending.userId }, { session, projection: { email: 1, 'profile.displayName': 1 } });
@@ -684,6 +693,86 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
     await audit(db, { action: 'admin.export_run', actorId: auth.userId, entityType: 'data_request', entityId: r._id, requestId: request.id });
     return { status: 'completed' };
   });
+
+  // ---------------------------------------------------------------- colleges
+  // Admins add the colleges people can choose when they sign up, and can pause one.
+  app.get('/colleges', { schema: { tags: ['admin'], summary: 'Colleges people can sign up to' } }, async (request) => {
+    requireRole(request, 'admin');
+    const rows = await db.col('colleges').find({}).sort({ createdAt: 1 }).limit(500).toArray();
+    const counts = await users()
+      .aggregate<{ _id: string; n: number }>([{ $match: { status: { $ne: 'deleted' } } }, { $group: { _id: '$collegeId', n: { $sum: 1 } } }])
+      .toArray();
+    const deps = await db.col('departments').aggregate<{ _id: string; n: number }>([{ $group: { _id: '$collegeId', n: { $sum: 1 } } }]).toArray();
+    const people = new Map(counts.map((c) => [c._id, c.n]));
+    const departments = new Map(deps.map((c) => [c._id, c.n]));
+    return {
+      items: rows.map((c) => ({ id: c._id, name: c.name, shortName: c.shortName, slug: c.slug, city: c.city, state: c.state, status: c.status, people: people.get(c._id) ?? 0, departments: departments.get(c._id) ?? 0, createdAt: c.createdAt.toISOString() })),
+    };
+  });
+
+  const collegeBody = z.object({
+    name: text(3, 160),
+    shortName: text(2, 40),
+    city: optionalText(80),
+    state: optionalText(80),
+    // Department names, one per line on the form (for the class step when people set up).
+    departments: z.array(text(2, 120)).max(40).default([]),
+  });
+  app.post('/colleges', { schema: { tags: ['admin'], summary: 'Add a college', body: collegeBody } }, async (request, reply) => {
+    const auth = requireRole(request, 'admin');
+    const b = request.body;
+    const slugBase = b.shortName.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'college';
+    let slug = slugBase.length >= 2 ? slugBase : `${slugBase}-college`;
+    if (await db.col('colleges').findOne({ slug }, { projection: { _id: 1 } })) slug = `${slug.slice(0, 34)}-${Math.floor(100 + Math.random() * 900)}`;
+    if (await db.col('colleges').findOne({ name: { $regex: `^${b.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' } }, { projection: { _id: 1 } })) {
+      throw Errors.conflict('A college with this name already exists.');
+    }
+    const now = new Date();
+    const id = uuidv7();
+    await db.tx(async (session) => {
+      await db.col('colleges').insertOne(
+        { _id: id, slug, name: cleanText(b.name), shortName: cleanText(b.shortName), city: b.city ? cleanText(b.city) : null, state: b.state ? cleanText(b.state) : null, timezone: 'Asia/Kolkata', shard: 'default', status: 'active', domains: [], settings: {}, createdAt: now, updatedAt: now },
+        { session },
+      );
+      const used = new Set<string>();
+      const deptDocs = [...new Set(b.departments.map((d) => cleanText(d)))].map((name) => {
+        let code = name.replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).map((w) => w[0]!.toUpperCase()).join('').slice(0, 8) || 'DEPT';
+        if (code.length < 2) code = `${code}X`;
+        let n = 2;
+        const base = code;
+        while (used.has(code)) code = `${base.slice(0, 10)}${n++}`;
+        used.add(code);
+        return { _id: uuidv7(), collegeId: id, code, name, createdAt: now };
+      });
+      if (deptDocs.length) await db.col('departments').insertMany(deptDocs, { session });
+      await audit(db, { action: 'admin.college_create', actorId: auth.userId, actorRole: auth.role, collegeId: auth.collegeId, entityType: 'college', entityId: id, requestId: request.id, meta: { name: b.name } }, session);
+    });
+    await app.deps.cache.del('meta:colleges');
+    return reply.status(201).send({ id, slug });
+  });
+
+  app.patch(
+    '/colleges/:id',
+    { schema: { tags: ['admin'], summary: 'Rename a college, or pause new sign-ups to it', params: idParam, body: z.object({ name: text(3, 160).optional(), shortName: text(2, 40).optional(), city: optionalText(80), state: optionalText(80), status: z.enum(['active', 'suspended']).optional() }) } },
+    async (request) => {
+      const auth = requireRole(request, 'admin');
+      const b = request.body;
+      const set: Document = { updatedAt: new Date() };
+      if (b.name) set.name = cleanText(b.name);
+      if (b.shortName) set.shortName = cleanText(b.shortName);
+      if (b.city !== undefined) set.city = b.city ? cleanText(b.city) : null;
+      if (b.state !== undefined) set.state = b.state ? cleanText(b.state) : null;
+      if (b.status) {
+        if (b.status === 'suspended' && request.params.id === auth.collegeId) throw Errors.badRequest('You cannot pause your own college.');
+        set.status = b.status;
+      }
+      const res = await db.col('colleges').updateOne({ _id: request.params.id }, { $set: set });
+      if (!res.matchedCount) throw Errors.notFound('This college');
+      await audit(db, { action: 'admin.college_update', actorId: auth.userId, actorRole: auth.role, collegeId: auth.collegeId, entityType: 'college', entityId: request.params.id, requestId: request.id, meta: b });
+      await app.deps.cache.del('meta:colleges');
+      return { status: 'saved' };
+    },
+  );
 
   // Keeps the role list in one place for the web's admin screens.
   app.get('/roles', { schema: { tags: ['admin'], summary: 'Roles and what each can see' } }, async (request) => {

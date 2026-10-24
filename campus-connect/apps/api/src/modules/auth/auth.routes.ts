@@ -55,39 +55,38 @@ export const authRoutes: FastifyPluginAsync = async (base) => {
       schema: {
         tags: ['auth'],
         summary: 'Create an account with any email address and password',
+        // Just the basics, for every role: name, email, mobile, date of birth and a password.
+        // The age comes from the date of birth (18 or over). Students and faculty choose their
+        // college; faculty and industry experts are approved by an admin before they can sign in.
         body: z.object({
           email,
           password,
           displayName: text(2, 80),
-          // Who is joining, and the details each role is asked for (kept private).
           role: z.enum(['student', 'faculty', 'expert']).default('student'),
-          roleInfo: roleInfo.default({}),
+          phone: z
+            .string()
+            .trim()
+            .transform((v) => v.replace(/[\s()-]/g, ''))
+            .pipe(z.string().regex(/^\+?[0-9]{10,15}$/, 'Enter a valid mobile number, for example +91 98765 43210.')),
+          dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Enter your date of birth.'),
           acceptTerms: z.boolean(),
-          confirmAdult: z.boolean(),
           marketingOptIn: z.boolean().default(false),
           anonymousId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/).optional(),
           collegeId: uuid.optional(),
-        }).superRefine((b, ctx) => {
-          const need = (field: keyof typeof b.roleInfo, message: string) => {
-            if (!b.roleInfo[field]) ctx.addIssue({ code: 'custom', path: ['roleInfo', field], message });
-          };
-          if (b.role === 'student') need('enrollmentNumber', 'Enter your enrolment (PRN) number.');
-          if (b.role === 'faculty') {
-            need('employeeId', 'Enter your employee ID.');
-            need('designation', 'Enter your designation, for example Assistant Professor.');
-          }
-          if (b.role === 'expert') {
-            need('organization', 'Enter your company or organisation.');
-            need('designation', 'Enter your role there.');
-          }
+          // Older apps may still send these; they are no longer asked for.
+          roleInfo: roleInfo.optional(),
+          confirmAdult: z.boolean().optional(),
         }),
       },
     },
     async (request, reply) => {
       // Sign-ups have their own switch so they can be paused without blocking sign-ins.
       if (!(await app.deps.flags.isEnabled('module.registration'))) throw Errors.featureDisabled('module.registration');
-      await service.register(request.body, meta(request));
-      return reply.status(202).send(CHECK_EMAIL);
+      const result = await service.register(request.body, meta(request));
+      // Local development without a mail server: show the confirmation link right away, since
+      // emails only land in Admin → System → Email. Never in production.
+      const devLink = app.deps.mailer.mode === 'dev' && !app.deps.config.isProd ? (result?.verifyUrl ?? null) : null;
+      return reply.status(202).send(devLink ? { ...CHECK_EMAIL, devLink } : CHECK_EMAIL);
     },
   );
 
@@ -95,8 +94,10 @@ export const authRoutes: FastifyPluginAsync = async (base) => {
     '/verify-email',
     { config: limits.tokenAction, schema: { tags: ['auth'], summary: 'Confirm an email address and sign in', body: z.object({ token }) } },
     async (request, reply) => {
-      const { userId, session } = await service.verifyEmail(request.body.token, meta(request));
-      return deliver(request, reply, userId, session);
+      const r = await service.verifyEmail(request.body.token, meta(request));
+      // Faculty and experts confirm their email but can sign in only once an admin approves.
+      if (!r.session) return reply.status(202).send({ status: 'approval_pending', message: Errors.approvalPending(r.pendingRole ?? 'faculty').message });
+      return deliver(request, reply, r.userId, r.session);
     },
   );
 

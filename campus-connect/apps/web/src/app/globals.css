@@ -14,10 +14,10 @@
 
 :root,
 [data-theme="day"] {
-  --bg: #FFFFFF;
-  --surface: #F8FAFC;
+  --bg: #FFFDF5;
+  --surface: #FFFFFF;
   --surface-solid: #FFFFFF;
-  --surface-2: #F1F5F9;
+  --surface-2: #F6F2E6;
   --surface-3: #E2E8F0;
   --border: #E2E8F0;
   --text: #0F172A;
@@ -53,6 +53,53 @@
   --hl-yellow: #FDE68A;
   --hl-pink: #FBCFE8;
   --hl-green: #BBF7D0;
+}
+
+/* Pro: lavender-white page, white cards, Deep Blueberry for actions, Soda Green for highlights. */
+[data-theme="pro"] {
+  --bg: #F6F4FF;
+  --surface: #FFFFFF;
+  --surface-solid: #FFFFFF;
+  --surface-2: #EFECFB;
+  --surface-3: #E1DCF5;
+  --border: #E3DEF5;
+  --text: #14112E;
+  --text-2: #4A4670;
+  --text-3: #6B6794;
+  --accent: #302675;
+  --accent-ink: #FFFFFF;
+  --accent-soft: #E7E3FB;
+  --accent-soft-ink: #302675;
+  --mark: #302675;
+  --mark-soft: #E7E3FB;
+  --highlight: #B8F28B;
+  --highlight-ink: #13112A;
+  --success: #1F7A3A;
+  --success-soft: #DCF6C8;
+  --warning: #A25A00;
+  --warning-soft: #FDEBC4;
+  --danger: #C6341F;
+  --danger-soft: #FDE3DE;
+  --info: #3B3FB5;
+  --info-soft: #E3E4FB;
+  --glass: #FFFFFF;
+  --glass-border: #E3DEF5;
+  --glass-shadow: 0 14px 34px -16px rgb(48 38 117 / 0.28);
+  --shadow-card: 0 1px 2px rgb(48 38 117 / 0.06);
+  --orb-a: #302675;
+  --orb-b: #302675;
+  --aura-opacity: 0;
+  color-scheme: light;
+  --accent-hover: #3D31A0;
+  --hl-violet: #D9D2F7;
+  --hl-blue: #CDDDFB;
+  --hl-yellow: #FBE9A6;
+  --hl-pink: #F8D0E3;
+  --hl-green: #CBF2A8;
+  --day-morning: #F1EEFF;
+  --day-afternoon: #F6F4FF;
+  --day-evening: #EFEAFB;
+  --day-night: #E1DCF5;
 }
 
 [data-theme="night"] {
@@ -216,9 +263,17 @@
   --animate-grow-x: grow-x 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
-/* Font choice (Settings > Appearance). The CampusConnect look is Kalam for everything; the
-   other two are accessibility choices a person can pick for themselves. */
+/* Font choice (Settings > Appearance). Pro is Space Grotesk and the default; Doodle is Kalam;
+   General and Easy to read are for people who want their device font or an accessible one. */
 :root,
+:root[data-font="pro"] {
+  --ff-ui: var(--font-pro), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ff-display: var(--ff-ui);
+  --ff-read: var(--ff-ui);
+  --fsa-read: none;
+  --fsa-display: none;
+}
+/* Doodle: Kalam for everything (titles, highlight labels, body text, buttons and forms). */
 :root[data-font="handwritten"] {
   --ff-ui: var(--font-kalam), "Segoe Print", cursive, ui-sans-serif, system-ui, sans-serif;
   --ff-display: var(--ff-ui);
@@ -244,11 +299,11 @@
 }
 /* In the base layer, so component classes (font-semibold...) still win. */
 @layer base {
-  :root:is([data-font="system"], [data-font="readable"]) :is(h1, h2, h3, h4, h5, h6, .font-display) {
+  :root:is([data-font="pro"], [data-font="system"], [data-font="readable"]) :is(h1, h2, h3, h4, h5, h6, .font-display) {
     font-weight: 700;
     letter-spacing: -0.01em;
   }
-  :root:is([data-font="system"], [data-font="readable"]) body {
+  :root:is([data-font="pro"], [data-font="system"], [data-font="readable"]) body {
     font-synthesis-weight: auto;
   }
 }
@@ -304,6 +359,13 @@
   h6,
   .font-display {
     font-size-adjust: var(--fsa-display);
+  }
+  /* Doodle: notebook-grid paper behind everything. */
+  [data-theme="day"] body {
+    background-image:
+      linear-gradient(to right, rgb(124 58 237 / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(124 58 237 / 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
   }
   [data-theme="paper"] body {
     font-size: 1.04rem;
@@ -607,4 +669,44 @@
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* Loops: a thin progress line along the bottom that can be dragged to jump. */
+.loop-seek {
+  --seek: 0%;
+}
+.loop-seek::-webkit-slider-runnable-track {
+  height: 3px;
+  background: linear-gradient(to right, #fff var(--seek), rgb(255 255 255 / 0.3) var(--seek));
+}
+.loop-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border-radius: 9999px;
+  background: #fff;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.loop-seek:hover::-webkit-slider-thumb,
+.loop-seek:active::-webkit-slider-thumb,
+.loop-seek:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+}
+.loop-seek::-moz-range-track {
+  height: 3px;
+  background: rgb(255 255 255 / 0.3);
+}
+.loop-seek::-moz-range-progress {
+  height: 3px;
+  background: #fff;
+}
+.loop-seek::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 9999px;
+  background: #fff;
 }

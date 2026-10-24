@@ -87,8 +87,13 @@ export interface PostView {
   likesCount: number;
   commentsCount: number;
   savesCount: number;
+  viewsCount: number;
+  /** Cover image of a video post, if one was chosen. */
+  cover: FileView | null;
   liked: boolean;
   saved: boolean;
+  /** Whether I follow the author (false for my own and anonymous posts). */
+  followsAuthor: boolean;
   pinned: boolean;
   createdAt: string;
 }
@@ -98,16 +103,19 @@ export async function toPostViews(deps: Deps, viewerId: string, posts: Post[]): 
   if (!posts.length) return [];
   const db = deps.db;
   const ids = posts.map((p) => p._id);
-  const [people, files, liked, saved, votes, mine, spaces, departments] = await Promise.all([
+  const authorIds = [...new Set(posts.map((p) => p.authorId).filter((x): x is string => Boolean(x) && x !== viewerId))];
+  const [people, files, liked, saved, votes, mine, spaces, departments, follows] = await Promise.all([
     loadPeople(deps, posts.map((p) => p.authorId)),
-    loadFileViews(deps, posts.flatMap((p) => p.attachmentIds)),
+    loadFileViews(deps, [...posts.flatMap((p) => p.attachmentIds), ...posts.map((p) => p.coverFileId).filter((x): x is string => Boolean(x))]),
     db.col('post_likes').find({ _id: { $in: ids.map((i) => `${i}:${viewerId}`) } }, { projection: { postId: 1 } }).toArray(),
     db.col('saved_items').find({ _id: { $in: ids.map((i) => `${viewerId}:post:${i}`) } }, { projection: { itemId: 1 } }).toArray(),
     db.col('poll_votes').find({ _id: { $in: posts.filter((p) => p.poll).map((p) => `${p._id}:${viewerId}`) } }, { projection: { postId: 1, optionId: 1 } }).toArray(),
     db.col('anonymous_authors').find({ _id: { $in: posts.filter((p) => p.isAnonymous).map((p) => `post:${p._id}`) }, userId: viewerId }, { projection: { contentId: 1 } }).toArray(),
     db.col('spaces').find({ _id: { $in: posts.map((p) => p.audience.spaceId).filter((x): x is string => Boolean(x)) } }, { projection: { name: 1, slug: 1 } }).toArray(),
     departmentNames(db, posts.map((p) => p.audience.departmentId)),
+    authorIds.length ? db.col('follows').find({ followerId: viewerId, followeeId: { $in: authorIds } }, { projection: { followeeId: 1 } }).toArray() : Promise.resolve([]),
   ]);
+  const followed = new Set(follows.map((f) => f.followeeId));
   const likedSet = new Set(liked.map((l) => l.postId));
   const savedSet = new Set(saved.map((s) => s.itemId));
   const mineSet = new Set(mine.map((m) => m.contentId));
@@ -137,8 +145,11 @@ export async function toPostViews(deps: Deps, viewerId: string, posts: Post[]): 
       likesCount: p.likesCount,
       commentsCount: p.commentsCount,
       savesCount: p.savesCount,
+      viewsCount: p.viewsCount ?? 0,
+      cover: p.coverFileId ? (files.get(p.coverFileId) ?? null) : null,
       liked: likedSet.has(p._id),
       saved: savedSet.has(p._id),
+      followsAuthor: !p.isAnonymous && Boolean(p.authorId) && followed.has(p.authorId!),
       pinned: p.isPinned,
       createdAt: p.createdAt.toISOString(),
     };

@@ -14,6 +14,7 @@ import type { Discussion, DiscussionReply, Space, SpaceMember } from '../../infr
 import { limits } from '../../plugins/traffic.js';
 import type { AuthContext } from '../../types/fastify.js';
 import { blockedIds, loadPeople, personOf } from '../users/people.js';
+import { memberKey, newMember } from '../chats/chats.service.js';
 
 // /v1/spaces, /v1/discussions — communities and their discussion boards.
 //
@@ -213,6 +214,73 @@ export const spaceRoutes: FastifyPluginAsync = async (base) => {
     },
   );
 
+  // Spaces work like WhatsApp communities: each one has a group chat for its members, created the
+  // first time someone opens it. Members join the chat when they open it; leaving the space
+  // leaves the chat. Space owners and moderators are the chat's admins.
+  app.post('/spaces/:id/chat', { config: limits.write, schema: { tags: ['spaces'], summary: 'Open (or start) the space group chat', params: idParam } }, async (request) => {
+    const auth = requireAuth(request);
+    const s = await access(auth, request.params.id);
+    if (s.myStatus !== 'active') throw Errors.forbidden('Join the space to use its group chat.');
+    if (s.status !== 'active') throw Errors.conflict('This space is not open yet.');
+    const chats = db.col('chats');
+    const now = new Date();
+    let chat = await chats.findOne({ spaceId: s.id, kind: 'community' });
+    if (!chat) {
+      const id = uuidv7();
+      try {
+        await chats.insertOne({ _id: id, collegeId: auth.collegeId, kind: 'community', title: s.name, description: s.space.description || null, createdBy: auth.userId, directKey: null, spaceId: s.id, eventId: null, onlyAdminsPost: false, disappearingSeconds: null, lastMessageAt: now, createdAt: now, updatedAt: now });
+      } catch (err) {
+        if ((err as { code?: number }).code !== 11000) throw err;
+      }
+      chat = await chats.findOne({ spaceId: s.id, kind: 'community' });
+      if (!chat) throw Errors.unavailable('chats');
+    }
+    const role = s.myRole === 'owner' ? (chat.createdBy === auth.userId ? 'owner' : 'admin') : s.myRole === 'moderator' ? 'admin' : 'member';
+    await db.col('chat_members').updateOne({ _id: memberKey(chat._id, auth.userId) }, { $setOnInsert: newMember(chat._id, auth.userId, role) }, { upsert: true });
+    return { chatId: chat._id };
+  });
+
+  // Spaces worth joining: shared interests, people you follow, your department, and what is
+  // active at your college. Each suggestion says why it is suggested.
+  app.get('/spaces/suggested', { schema: { tags: ['spaces'], summary: 'Spaces suggested for me', querystring: z.object({ limit: z.coerce.number().int().min(1).max(20).default(8) }) } }, async (request) => {
+    const auth = requireAuth(request);
+    const [me, mine, follows] = await Promise.all([
+      db.col('users').findOne({ _id: auth.userId }, { projection: { 'profile.interests': 1, 'profile.skills': 1, 'profile.departmentId': 1 } }),
+      members().find({ userId: auth.userId }, { projection: { spaceId: 1 } }).toArray(),
+      db.col('follows').find({ followerId: auth.userId }, { projection: { followeeId: 1 } }).limit(2000).toArray(),
+    ]);
+    const joined = mine.map((m) => m.spaceId);
+    const candidates = await spaces()
+      .find({ collegeId: auth.collegeId, status: 'active', _id: { $nin: joined } })
+      .sort({ membersCount: -1 })
+      .limit(200)
+      .toArray();
+    if (!candidates.length) return { items: [] };
+    const ids = candidates.map((c) => c._id);
+    const followIds = follows.map((f) => f.followeeId);
+    const [friendRows, activeRows] = await Promise.all([
+      followIds.length
+        ? members().aggregate<{ _id: string; n: number }>([{ $match: { spaceId: { $in: ids }, userId: { $in: followIds }, status: 'active' } }, { $group: { _id: '$spaceId', n: { $sum: 1 } } }]).toArray()
+        : Promise.resolve([]),
+      discussions().aggregate<{ _id: string; n: number }>([{ $match: { spaceId: { $in: ids }, createdAt: { $gt: new Date(Date.now() - 14 * 86_400_000) } } }, { $group: { _id: '$spaceId', n: { $sum: 1 } } }]).toArray(),
+    ]);
+    const friends = new Map(friendRows.map((r) => [r._id, r.n]));
+    const active = new Map(activeRows.map((r) => [r._id, r.n]));
+    const words = new Set([...(me?.profile?.interests ?? []), ...(me?.profile?.skills ?? [])].map((w) => String(w).toLowerCase().replace(/\s+/g, '-')));
+    const scored = candidates.map((c) => {
+      const shared = c.tags.filter((t) => words.has(t) || [...words].some((w) => w.length > 2 && (t.includes(w) || w.includes(t))));
+      const f = friends.get(c._id) ?? 0;
+      const a = active.get(c._id) ?? 0;
+      const score = Math.min(f, 5) * 3 + shared.length * 4 + Math.min(a, 10) * 0.5 + Math.log10(c.membersCount + 1);
+      const reason = f ? `${f} ${f === 1 ? 'person' : 'people'} you follow ${f === 1 ? 'is' : 'are'} here` : shared.length ? `Matches your interests: ${shared.slice(0, 2).join(', ')}` : a ? `${a} new discussion${a === 1 ? '' : 's'} this fortnight` : `Popular at your college`;
+      return { c, score, reason };
+    });
+    scored.sort((x, y) => y.score - x.score);
+    return {
+      items: scored.slice(0, request.query.limit).map(({ c, reason }) => ({ id: c._id, slug: c.slug, name: c.name, kind: c.kind, privacy: c.privacy, description: c.description, tags: c.tags, membersCount: c.membersCount, membership: null, reason })),
+    };
+  });
+
   app.post('/spaces/:id/join', { config: limits.write, schema: { tags: ['spaces'], summary: 'Join (or ask to join a private space)', params: idParam } }, async (request) => {
     const auth = requireAuth(request);
     const s = await access(auth, request.params.id);
@@ -244,6 +312,9 @@ export const spaceRoutes: FastifyPluginAsync = async (base) => {
     }
     const removed = await members().findOneAndDelete({ _id: memberId(s.id, auth.userId), status: { $ne: 'banned' } });
     if (removed?.status === 'active') await countMembers(s.id, -1);
+    // Leaving the space also leaves its group chat.
+    const spaceChat = await db.col('chats').findOne({ spaceId: s.id, kind: 'community' }, { projection: { _id: 1 } });
+    if (spaceChat) await db.col('chat_members').deleteOne({ _id: memberKey(spaceChat._id, auth.userId) });
     return { status: 'left' };
   });
 

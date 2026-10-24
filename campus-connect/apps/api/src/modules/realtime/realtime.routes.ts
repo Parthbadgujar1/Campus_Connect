@@ -49,4 +49,17 @@ export const realtimeRoutes: FastifyPluginAsync = async (base) => {
       realtime.attach(socket, { id: userId, name: u.profile.displayName });
     },
   );
+
+  // Online / last seen: remember when someone was last active, and tell others when they come
+  // and go, unless they turned off "last seen & online" (Settings → Privacy).
+  realtime.onPresence((userId, online) => {
+    const at = new Date();
+    void db
+      .col('users')
+      .findOneAndUpdate({ _id: userId }, { $set: { lastActiveAt: at } }, { projection: { 'profile.visibility.showOnline': 1 } })
+      .then((u) => {
+        if (u && u.profile?.visibility?.showOnline !== false) realtime.toAll({ type: 'presence', userId, online, at: at.toISOString() });
+      })
+      .catch(() => undefined);
+  });
 };

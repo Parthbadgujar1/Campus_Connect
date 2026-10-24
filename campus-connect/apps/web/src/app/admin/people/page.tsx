@@ -32,6 +32,8 @@ interface UserDetail {
   role: ApiRole;
   pendingRole: 'faculty' | 'expert' | null;
   roleInfo: Record<string, string | number | null>;
+  phone: string | null;
+  age: number | null;
   status: string;
   emailVerifiedAt: string | null;
   joinedAt: string;
@@ -78,8 +80,8 @@ function PersonSheet({ id, onClose }: { id: string; onClose: () => void }) {
             {u.pendingRole && <Badge tone="warning">Asked for {u.pendingRole} access</Badge>}
           </div>
           <Card className="p-4">
-            <p className="mb-2 text-[13px] font-semibold">Sign-up details</p>
-            <RoleInfoList info={u.roleInfo} />
+            <p className="mb-2 text-[13px] font-semibold">Sign-up details (private)</p>
+            <RoleInfoList info={{ Mobile: u.phone, Age: u.age, ...u.roleInfo }} />
           </Card>
 
           {self ? (
@@ -211,7 +213,7 @@ function RequestCard({ r, onDone }: { r: VerificationRow; onDone: () => void }) 
         </div>
         <Badge tone={roleRequest ? 'warning' : 'info'}>{KIND_LABEL[r.kind]}</Badge>
       </div>
-      <RoleInfoList info={r.roleInfo} />
+      <RoleInfoList info={{ Mobile: r.phone, Age: r.age, College: r.college, ...r.roleInfo }} />
       {r.note && <p className="rounded-xl bg-surface-2 px-3 py-2 text-[14px]">“{r.note}”</p>}
       {r.documentUrl && (
         <a href={r.documentUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-accent">

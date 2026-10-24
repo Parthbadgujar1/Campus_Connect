@@ -66,7 +66,8 @@ export const SCHEMA: CollectionSpec[] = [
     },
     indexes: [
       { key: { slug: 1 }, options: { unique: true } },
-      { key: { 'domains.domain': 1 }, options: { unique: true } },
+      // Unique among colleges that list email domains (colleges without any are fine).
+      { key: { 'domains.domain': 1 }, options: { unique: true, name: 'college_email_domain', partialFilterExpression: { 'domains.domain': { $exists: true } } } },
     ],
   },
   {
@@ -92,7 +93,7 @@ export const SCHEMA: CollectionSpec[] = [
             },
             ['username', 'usernameLower', 'displayName', 'skills', 'interests', 'followersCount', 'followingCount'],
           ),
-          settings: obj({ theme: str({ enum: ['system', 'day', 'night', 'paper'] }), font: str({ enum: ['handwritten', 'classic', 'system', 'readable'] }), textSize: str({ enum: ['sm', 'md', 'lg'] }), seen: arr(str({ max: 80 }), 500) }),
+          settings: obj({ theme: str({ enum: ['system', 'pro', 'day', 'night', 'paper'] }), font: str({ enum: ['pro', 'handwritten', 'classic', 'system', 'readable'] }), textSize: str({ enum: ['sm', 'md', 'lg'] }), seen: arr(str({ max: 80 }), 500) }),
           notificationPrefs: obj({ emailDigest: str({ enum: ['off', 'daily', 'weekly'] }), marketingEmails: bool() }),
         },
         ['_id', 'collegeId', 'email', 'role', 'status', 'profile', 'settings', 'notificationPrefs', 'createdAt'],
@@ -232,9 +233,9 @@ export const SCHEMA: CollectionSpec[] = [
         {
           $jsonSchema: obj(
             {
-              kind: str({ enum: ['post', 'question', 'poll', 'announcement'] }), body: str({ min: 1, max: 5000 }), isAnonymous: bool(),
+              kind: str({ enum: ['post', 'question', 'poll', 'announcement'] }), body: str({ max: 5000 }), isAnonymous: bool(),
               audience: obj({ type: str({ enum: ['college', 'department', 'year', 'division', 'space'] }) }, ['type']),
-              tags: arr(str({ max: 30 }), 10), attachmentIds: arr(uuid(), 10), likesCount: num({ min: 0 }), commentsCount: num({ min: 0 }), savesCount: num({ min: 0 }), status: str({ enum: CONTENT }),
+              tags: arr(str({ max: 30 }), 10), attachmentIds: arr(uuid(), 10), likesCount: num({ min: 0 }), commentsCount: num({ min: 0 }), savesCount: num({ min: 0 }), viewsCount: num({ min: 0 }), status: str({ enum: CONTENT }),
             },
             ['collegeId', 'isAnonymous', 'kind', 'body', 'audience', 'tags', 'attachmentIds', 'likesCount', 'commentsCount', 'savesCount', 'status', 'createdAt'],
           ),
@@ -256,6 +257,25 @@ export const SCHEMA: CollectionSpec[] = [
   },
   { name: 'poll_votes', indexes: [{ key: { postId: 1, userId: 1 } }] },
   { name: 'post_likes', indexes: [{ key: { userId: 1, createdAt: -1 } }, { key: { postId: 1 } }] },
+  // One row per person who watched a video post, so each viewer is counted once.
+  { name: 'post_views', indexes: [{ key: { userId: 1 } }, { key: { postId: 1 } }] },
+  // Status updates and who saw them disappear 24 hours after posting (TTL on expiresAt).
+  {
+    name: 'statuses',
+    validator: { $jsonSchema: obj({ collegeId: uuid(), userId: uuid(), kind: str({ enum: ['text', 'image', 'video'] }), text: str({ nullable: true, max: 700 }), caption: str({ nullable: true, max: 300 }), viewsCount: num({ min: 0 }), expiresAt: date() }, ['collegeId', 'userId', 'kind', 'viewsCount', 'createdAt', 'expiresAt']) },
+    indexes: [
+      { key: { collegeId: 1, userId: 1, expiresAt: 1 } },
+      { key: { expiresAt: 1 }, options: { expireAfterSeconds: 0 } },
+    ],
+  },
+  {
+    name: 'status_views',
+    indexes: [
+      { key: { statusId: 1, createdAt: -1 } },
+      { key: { viewerId: 1 } },
+      { key: { expiresAt: 1 }, options: { expireAfterSeconds: 0 } },
+    ],
+  },
   {
     name: 'comments',
     validator: {
@@ -334,6 +354,8 @@ export const SCHEMA: CollectionSpec[] = [
       { key: { directKey: 1 }, options: { unique: true, partialFilterExpression: { directKey: { $type: 'string' } } } },
       { key: { collegeId: 1, kind: 1 } },
       { key: { spaceId: 1 }, options: { partialFilterExpression: { spaceId: { $type: 'string' } } } },
+      // One group chat per space (spaces work like communities).
+      { key: { spaceId: 1, kind: 1 }, options: { unique: true, name: 'one_chat_per_space', partialFilterExpression: { kind: 'community' } } },
     ],
   },
   {

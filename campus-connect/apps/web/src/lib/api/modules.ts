@@ -373,6 +373,9 @@ export interface VerificationRow {
   reviewerNote: string | null;
   person: PersonSummary;
   email: string | null;
+  phone: string | null;
+  age: number | null;
+  college: string | null;
   roleInfo: Record<string, string | number | null>;
   documentUrl: string | null;
   createdAt: string;
@@ -398,4 +401,36 @@ export interface QueueItem {
   submittedBy: PersonSummary;
   link: string;
   submittedAt: string;
+}
+
+// ---------------------------------------------------------------- status (24-hour updates)
+export type StatusBackground = 'violet' | 'blue' | 'green' | 'rose' | 'amber' | 'slate';
+export interface StatusItem {
+  id: string;
+  kind: 'text' | 'image' | 'video';
+  text: string | null;
+  background: StatusBackground;
+  caption: string | null;
+  file: FileView | null;
+  /** Only on my own statuses. */
+  viewsCount?: number;
+  seen: boolean;
+  createdAt: string;
+  expiresAt: string;
+}
+export interface StatusGroup {
+  person: PersonSummary;
+  items: StatusItem[];
+  allSeen: boolean;
+  latestAt: string | null;
+}
+export interface StatusFeed {
+  mine: StatusGroup | null;
+  updates: StatusGroup[];
+}
+
+export interface Presence {
+  visible: boolean;
+  online: boolean;
+  lastSeenAt: string | null;
 }

@@ -60,8 +60,8 @@ export const privacyRoutes: FastifyPluginAsync = async (base) => {
         tags: ['me'],
         summary: 'Change appearance, or record onboarding/tour progress',
         body: z.object({
-          theme: z.enum(['system', 'day', 'night', 'paper']).optional(),
-          font: z.enum(['handwritten', 'system', 'readable']).optional(),
+          theme: z.enum(['system', 'pro', 'day', 'night', 'paper']).optional(),
+          font: z.enum(['pro', 'handwritten', 'system', 'readable']).optional(),
           textSize: z.enum(['sm', 'md', 'lg']).optional(),
           reduceMotion: z.boolean().optional(),
           highContrast: z.boolean().optional(),

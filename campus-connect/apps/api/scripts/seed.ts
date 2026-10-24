@@ -44,7 +44,7 @@ import type { Purpose } from '../src/modules/files/file-policy.js';
 import { FLAG_DEFAULTS } from '../src/modules/flags/flags.service.js';
 import { defaultNotificationPrefs, defaultProfile, defaultSettings } from '../src/modules/users/defaults.js';
 
-export const DEMO_PASSWORD = 'Demo-Campus-2026!';
+export const DEMO_PASSWORD = 'Vishu@123';
 
 const DAY = 86_400_000;
 const HOUR = 3_600_000;

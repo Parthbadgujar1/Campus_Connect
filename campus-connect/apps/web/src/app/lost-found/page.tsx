@@ -201,7 +201,7 @@ function LostFoundInner() {
   const list = useInfinite<LostFoundView>(`lostfound:list:${include}:${kind}:${category}:${q}`, (cursor, signal) => get<Page<LostFoundView>>('/lost-found', { include, kind: kind ?? undefined, category: category ?? undefined, q: q || undefined, cursor: cursor ?? undefined, limit: 15 }, signal));
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-28 md:px-8 md:pb-12">
-      <PageHeader title="Lost & found" subtitle={`On ${user?.college.shortName ?? 'campus'}`} back backHref="/campus" actions={<Button size="sm" onClick={() => setReporting(true)}><Plus className="h-4 w-4" aria-hidden="true" /> Report</Button>} />
+      <PageHeader title="Lost & found" subtitle={user && user.role !== 'expert' ? `On ${user.college.shortName}` : 'On campus'} back backHref="/campus" actions={<Button size="sm" onClick={() => setReporting(true)}><Plus className="h-4 w-4" aria-hidden="true" /> Report</Button>} />
       <Reveal className="space-y-3">
         <Segmented label="Which items" value={include} onChange={(v) => go({ include: v === 'open' ? null : v })} options={[{ value: 'open', label: 'Open' }, { value: 'resolved', label: 'Resolved' }, { value: 'mine', label: 'My reports' }]} />
         <form className="relative" onSubmit={(e) => { e.preventDefault(); go({ q: search.trim() || null }); }}>

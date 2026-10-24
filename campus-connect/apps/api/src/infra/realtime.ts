@@ -21,7 +21,11 @@ export type RealtimeEvent =
   | { type: 'chat.updated'; chatId: string }
   | { type: 'typing'; chatId: string; userId: string; name: string }
   | { type: 'notification.created'; notification: unknown }
-  | { type: 'flags.changed' };
+  | { type: 'flags.changed' }
+  // An area of the app changed at this college (see plugins/live-changes.ts).
+  | { type: 'changed'; collegeId: string; topics: string[] }
+  // Someone came online or went offline (only for people who share their activity).
+  | { type: 'presence'; userId: string; online: boolean; at: string };
 
 interface Client {
   id: string;
@@ -56,6 +60,7 @@ export class RealtimeHub {
   private readonly sub?: Redis;
   private heartbeat?: NodeJS.Timeout;
   private membershipCheck: MembershipCheck = async () => false;
+  private presenceListener?: (userId: string, online: boolean) => void;
 
   constructor(redisUrl: string | undefined, private readonly logger: Logger) {
     if (redisUrl) {
@@ -89,8 +94,19 @@ export class RealtimeHub {
     return this.pub?.status === 'ready' && this.sub?.status === 'ready';
   }
 
+  /** Called when a person's first connection opens and when their last one closes (this instance). */
+  onPresence(fn: (userId: string, online: boolean) => void): void {
+    this.presenceListener = fn;
+  }
+
+  /** Whether the person has an open connection to this instance. */
+  isOnline(userId: string): boolean {
+    return (this.byUser.get(userId)?.size ?? 0) > 0;
+  }
+
   attach(socket: WebSocket, user: { id: string; name: string }): void {
     const client: Client = { id: randomUUID(), userId: user.id, name: user.name, socket, chats: new Set(), alive: true, lastTypingAt: 0 };
+    const firstConnection = !this.byUser.get(user.id)?.size;
 
     // Cap connections per person (many tabs or a reconnect loop): drop the oldest.
     const existing = this.byUser.get(user.id);
@@ -112,12 +128,16 @@ export class RealtimeHub {
     socket.on('close', () => this.detach(client));
     socket.on('error', () => this.detach(client));
     this.send(client, { type: 'ready', connectionId: client.id, distributed: this.distributed });
+    if (firstConnection) this.presenceListener?.(user.id, true);
   }
 
   private detach(client: Client): void {
     if (!this.clients.delete(client.id)) return;
     this.byUser.get(client.userId)?.delete(client);
-    if (this.byUser.get(client.userId)?.size === 0) this.byUser.delete(client.userId);
+    if (this.byUser.get(client.userId)?.size === 0) {
+      this.byUser.delete(client.userId);
+      this.presenceListener?.(client.userId, false);
+    }
     for (const chatId of client.chats) {
       this.byChat.get(chatId)?.delete(client);
       if (this.byChat.get(chatId)?.size === 0) this.byChat.delete(chatId);

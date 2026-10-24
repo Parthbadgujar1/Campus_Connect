@@ -55,7 +55,10 @@ export default function WelcomePage() {
   useEffect(() => headingRef.current?.focus(), [step]);
 
   const first = useMemo(() => user?.profile.displayName.split(' ')[0] ?? 'there', [user]);
-  const current = STEPS[step]!;
+  // Industry experts are not in a class or department, so they skip that step.
+  const steps = useMemo(() => STEPS.filter((s) => s.key !== 'class' || user?.role !== 'expert'), [user?.role]);
+  const current = steps[step]!;
+  const isStudent = !user || user.role === 'student';
 
   const skipAll = async () => {
     await updateSettings({ onboarding: 'skipped', tour: 'skipped' }).catch(() => undefined);
@@ -89,16 +92,16 @@ export default function WelcomePage() {
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-5 pb-10 pt-6">
       <div className="flex items-center justify-between gap-3">
         <p className="font-sans text-[13px] font-semibold text-text-3">
-          Step {step + 1} of {STEPS.length}
+          Step {step + 1} of {steps.length}
         </p>
-        {step < STEPS.length - 1 && (
+        {step < steps.length - 1 && (
           <button type="button" onClick={skipAll} className="font-sans text-[14px] font-semibold text-text-2 hover:text-text">
             Skip setup
           </button>
         )}
       </div>
-      <div className="mt-3 flex gap-1.5" role="progressbar" aria-label="Setup progress" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1}>
-        {STEPS.map((s, i) => (
+      <div className="mt-3 flex gap-1.5" role="progressbar" aria-label="Setup progress" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={step + 1}>
+        {steps.map((s, i) => (
           <span key={s.key} className={cn('h-1.5 flex-1 rounded-full transition-colors', i <= step ? 'bg-accent' : 'bg-surface-3')} />
         ))}
       </div>
@@ -107,7 +110,7 @@ export default function WelcomePage() {
         {current.key === 'welcome' && (
           <>
             <h1 id="step-title" ref={headingRef} tabIndex={-1} className="marker-heading hl-blue text-[32px] font-bold leading-tight outline-none">
-              Hi {first}, welcome to {user?.college.shortName ?? 'CampusConnect'}
+              Hi {first}, welcome to {user && user.role !== 'expert' ? user.college.shortName : 'CampusConnect'}
             </h1>
             <p className="mt-3 text-[16px] text-text-2">Let&apos;s set things up so your feed, events and spaces fit you. It takes about a minute, and you can change everything later in Settings.</p>
             <ul className="font-sans mt-6 space-y-3 text-[15px]">
@@ -123,8 +126,8 @@ export default function WelcomePage() {
 
         {current.key === 'class' && (
           <>
-            <h1 id="step-title" ref={headingRef} tabIndex={-1} className="font-display text-[28px] outline-none">Your class</h1>
-            <p className="mt-2 text-[15px] text-text-2">Used to show you class and department posts. You choose who can see it on your profile.</p>
+            <h1 id="step-title" ref={headingRef} tabIndex={-1} className="font-display text-[28px] outline-none">{isStudent ? 'Your class' : 'Your department'}</h1>
+            <p className="mt-2 text-[15px] text-text-2">{isStudent ? 'Used to show you class and department posts. You choose who can see it on your profile.' : 'Used to show you your department’s posts and notices.'}</p>
             <div className="mt-6 space-y-4">
               <div className="space-y-1.5">
                 <label htmlFor="dept" className="font-sans text-sm font-semibold">Department</label>
@@ -135,7 +138,7 @@ export default function WelcomePage() {
                   </Select>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              {isStudent && <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <label htmlFor="year" className="font-sans text-sm font-semibold">Year</label>
                   <Select id="year" value={year} onChange={(e) => setYear(e.target.value)}>
@@ -154,7 +157,7 @@ export default function WelcomePage() {
                   <label htmlFor="div" className="font-sans text-sm font-semibold">Division</label>
                   <Input id="div" maxLength={8} value={division} onChange={(e) => setDivision(e.target.value.toUpperCase())} placeholder="A" />
                 </div>
-              </div>
+              </div>}
             </div>
           </>
         )}
@@ -271,7 +274,7 @@ export default function WelcomePage() {
           ) : (
             <span />
           )}
-          <Button onClick={() => setStep((s) => Math.min(s + 1, STEPS.length - 1))}>
+          <Button onClick={() => setStep((s) => Math.min(s + 1, steps.length - 1))}>
             {step === 0 ? "Let's go" : 'Continue'} <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>

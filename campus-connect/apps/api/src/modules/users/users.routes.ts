@@ -50,7 +50,7 @@ const profilePatch = z
     links: z.object({ github: httpsUrl.optional(), linkedin: httpsUrl.optional(), portfolio: httpsUrl.optional(), leetcode: httpsUrl.optional(), twitter: httpsUrl.optional(), instagram: httpsUrl.optional() }),
     avatarFileId: uuid.nullable(),
     messagePrivacy: z.enum(['everyone', 'connections', 'nobody']),
-    visibility: z.object({ profile: z.enum(['campus', 'connections']), showBranch: z.boolean(), showEmail: z.boolean(), showActivity: z.boolean() }),
+    visibility: z.object({ profile: z.enum(['campus', 'connections']), showBranch: z.boolean(), showEmail: z.boolean(), showActivity: z.boolean(), showOnline: z.boolean().optional() }),
   })
   .partial();
 
@@ -427,6 +427,17 @@ export const userRoutes: FastifyPluginAsync = async (base) => {
       postsCount,
       joinedAt: u.createdAt.toISOString(),
     };
+  });
+
+  // Online now / last seen, as shown in a chat header. People who turned off "last seen & online"
+  // are never shown as online and have no last seen (Settings → Privacy → Last seen & online).
+  app.get('/users/:id/presence', { schema: { tags: ['people'], summary: 'Whether someone is online, or when they were last seen', params: z.object({ id: uuid }) } }, async (request) => {
+    const auth = requireAuth(request);
+    const u = await db.col('users').findOne({ _id: request.params.id, collegeId: auth.collegeId, status: 'active' }, { projection: { lastActiveAt: 1, lastLoginAt: 1, 'profile.visibility.showOnline': 1 } });
+    if (!u || (await isBlockedBetween(db, auth.userId, u._id))) throw Errors.notFound('This person');
+    if (u.profile?.visibility?.showOnline === false) return { visible: false, online: false, lastSeenAt: null };
+    const last = u.lastActiveAt ?? u.lastLoginAt ?? null;
+    return { visible: true, online: app.deps.realtime.isOnline(u._id), lastSeenAt: last ? last.toISOString() : null };
   });
 
   app.post('/users/:id/follow', { schema: { tags: ['people'], summary: 'Follow someone', params: z.object({ id: uuid }) } }, async (request) => {

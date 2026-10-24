@@ -36,7 +36,7 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function Attachments({ files }: { files: FileView[] }) {
+export function Attachments({ files, poster }: { files: FileView[]; poster?: string | null }) {
   if (!files.length) return null;
   const images = files.filter((f) => f.kind === 'image' && f.url);
   const others = files.filter((f) => !(f.kind === 'image' && f.url));
@@ -54,7 +54,7 @@ export function Attachments({ files }: { files: FileView[] }) {
       )}
       {others.map((f) =>
         f.kind === 'video' && f.url ? (
-          <video key={f.id} src={f.url} controls preload="metadata" className="w-full rounded-2xl bg-black" aria-label={f.name} />
+          <video key={f.id} src={f.url} poster={poster ?? undefined} controls preload="metadata" playsInline className="max-h-[560px] w-full rounded-2xl bg-black" aria-label={f.name} />
         ) : f.kind === 'audio' && f.url ? (
           <audio key={f.id} src={f.url} controls preload="metadata" className="w-full" aria-label={f.name} />
         ) : (
@@ -222,7 +222,7 @@ export function LivePostCard({ post, onChange, onRemove, detailed = false }: { p
         )}
       </div>
 
-      <Attachments files={post.attachments} />
+      <Attachments files={post.attachments} poster={post.cover?.url} />
 
       {post.poll && (
         <div className="font-sans mt-4 space-y-2 rounded-2xl bg-surface-2 p-3.5" role="group" aria-label="Poll">

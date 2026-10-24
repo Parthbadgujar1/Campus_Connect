@@ -17,6 +17,10 @@ export type LiveEvent =
   | { type: 'chat.read'; chatId: string; userId: string; at: string }
   | { type: 'chat.updated'; chatId: string }
   | { type: 'typing'; chatId: string; userId: string; name: string }
+  | { type: 'changed'; collegeId: string; topics: string[] }
+  | { type: 'notification.created'; notification: unknown }
+  | { type: 'flags.changed' }
+  | { type: 'presence'; userId: string; online: boolean; at: string }
   | { type: 'ready' }
   | { type: 'subscribed'; chatId: string }
   | { type: 'error'; code: string; chatId?: string };

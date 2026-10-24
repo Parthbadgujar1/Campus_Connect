@@ -7,7 +7,7 @@ import { Errors } from '../../core/errors.js';
 import { canModerate, isStaff, requireAuth } from '../../core/guards.js';
 import { decodeCursor, encodeCursor, page, pageQuery } from '../../core/pagination.js';
 import { lowerThan, newerThan, olderThan } from '../../core/query.js';
-import { cleanText, idParam, tags, tagsPatch, text, uuid } from '../../core/validation.js';
+import { boolQuery, cleanText, idParam, tags, tagsPatch, text, uuid } from '../../core/validation.js';
 import { uuidv7 } from '../../infra/db/ids.js';
 import type { Comment, Post } from '../../infra/db/models.js';
 import { limits } from '../../plugins/traffic.js';
@@ -20,7 +20,8 @@ import { baseFilter, loadViewer, notifyMentions, postOwner, toPostViews, visible
 
 const createPost = z
   .object({
-    body: text(1, 5000),
+    // A caption is optional when there is a photo or video (as in Loops); otherwise required.
+    body: z.string().max(5000).default(''),
     kind: z.enum(['post', 'question', 'poll', 'announcement']).default('post'),
     audience: z.enum(['college', 'department', 'year', 'division', 'space']).default('college'),
     departmentId: uuid.optional(),
@@ -30,8 +31,11 @@ const createPost = z
     tags,
     anonymous: z.boolean().default(false),
     attachments: z.array(uuid).max(10).default([]),
+    /** An image the author picked as the cover of their video. */
+    coverId: uuid.optional(),
     poll: z.object({ options: z.array(text(1, 120)).min(2).max(6) }).optional(),
   })
+  .refine((b) => b.body.trim().length > 0 || b.attachments.length > 0, { message: 'Write something or add a photo or video.', path: ['body'] })
   .refine((b) => (b.kind === 'poll') === Boolean(b.poll), { message: 'Polls need 2-6 options; other posts have none.', path: ['poll'] })
   .refine((b) => !(b.anonymous && b.kind === 'announcement'), { message: 'Announcements cannot be anonymous.', path: ['anonymous'] });
 
@@ -69,16 +73,18 @@ export const feedRoutes: FastifyPluginAsync = async (base) => {
           authorId: uuid.optional(),
           tag: z.string().trim().toLowerCase().max(30).optional(),
           kind: z.enum(['post', 'question', 'poll', 'announcement']).optional(),
+          // Only people I follow (used by Loops: "Following").
+          following: boolQuery,
         }),
       },
     },
     async (request) => {
       const auth = requireAuth(request);
-      const { cursor, limit, scope, spaceId, authorId, tag, kind } = request.query;
+      const { cursor, limit, scope, spaceId, authorId, tag, kind, following } = request.query;
       const viewer = await loadViewer(app.deps, auth);
       const and: Filter<Post>[] = [visibleFilter(viewer)];
 
-      if (scope === 'following') {
+      if (scope === 'following' || following) {
         const follows = await db.col('follows').find({ followerId: auth.userId }, { projection: { followeeId: 1 } }).limit(5000).toArray();
         and.push({ authorId: { $in: follows.map((f) => f.followeeId) } });
       }
@@ -94,14 +100,12 @@ export const feedRoutes: FastifyPluginAsync = async (base) => {
         and[0] = baseFilter(viewer);
         and.push({ 'audience.type': 'space', 'audience.spaceId': spaceId });
       }
-      if (scope === 'author') {
-        if (!authorId) throw Errors.validation([{ field: 'authorId', message: 'Choose a person.' }]);
-        and.push({ authorId });
-      }
-      if (scope === 'tag') {
-        if (!tag) throw Errors.validation([{ field: 'tag', message: 'Choose a tag.' }]);
-        and.push({ tags: tag });
-      }
+      if (scope === 'author' && !authorId) throw Errors.validation([{ field: 'authorId', message: 'Choose a person.' }]);
+      // A person narrows any list (for example their Loops on their profile).
+      if (authorId) and.push({ authorId });
+      if (scope === 'tag' && !tag) throw Errors.validation([{ field: 'tag', message: 'Choose a tag.' }]);
+      // A tag narrows any list (for example Loops for #hackathon).
+      if (tag) and.push({ tags: tag });
       if (kind) and.push({ kind });
       if (scope === 'loops') and.push({ mediaKinds: 'video' });
       const after = decodeCursor(cursor);
@@ -181,6 +185,10 @@ export const feedRoutes: FastifyPluginAsync = async (base) => {
       }
       await assertOwnFiles(app.deps, auth.userId, b.attachments, ['post']);
       const kinds = b.attachments.length ? await db.col('files').distinct('kind', { _id: { $in: b.attachments } }) : [];
+      if (b.coverId) {
+        if (!kinds.includes('video')) throw Errors.validation([{ field: 'coverId', message: 'A cover is only for posts with a video.' }]);
+        await assertOwnFiles(app.deps, auth.userId, [b.coverId], ['post'], ['image']);
+      }
 
       const body = cleanText(b.body);
       const now = new Date();
@@ -200,6 +208,8 @@ export const feedRoutes: FastifyPluginAsync = async (base) => {
         likesCount: 0,
         commentsCount: 0,
         savesCount: 0,
+        viewsCount: 0,
+        coverFileId: b.coverId ?? null,
         status: 'published',
         createdAt: now,
         updatedAt: now,
@@ -216,6 +226,22 @@ export const feedRoutes: FastifyPluginAsync = async (base) => {
       return reply.status(201).send(view);
     },
   );
+
+  // Loops count each viewer once: the first time someone watches a video post for a moment.
+  app.post('/posts/:id/view', { config: { rateLimit: { max: 600, timeWindow: '1 hour' } }, schema: { tags: ['feed'], summary: 'Count my view of a video post (once per person)', params: idParam } }, async (request) => {
+    const auth = requireAuth(request);
+    const post = await visiblePost(request.params.id, auth);
+    let counted = false;
+    if (post.mediaKinds.includes('video') && post.authorId !== auth.userId) {
+      const res = await db.col('post_views').updateOne({ _id: `${post._id}:${auth.userId}` }, { $setOnInsert: { postId: post._id, userId: auth.userId, createdAt: new Date() } }, { upsert: true });
+      if (res.upsertedCount) {
+        await posts().updateOne({ _id: post._id }, { $inc: { viewsCount: 1 } });
+        counted = true;
+      }
+    }
+    const row = await posts().findOne({ _id: post._id }, { projection: { viewsCount: 1 } });
+    return { counted, viewsCount: row?.viewsCount ?? 0 };
+  });
 
   app.get('/posts/:id', { schema: { tags: ['feed'], summary: 'One post', params: idParam } }, async (request) => {
     const auth = requireAuth(request);

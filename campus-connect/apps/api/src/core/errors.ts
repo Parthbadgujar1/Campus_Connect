@@ -10,6 +10,7 @@ export type ErrorCode =
   | 'SESSION_EXPIRED'
   | 'EMAIL_NOT_VERIFIED'
   | 'ACCOUNT_SUSPENDED'
+  | 'APPROVAL_PENDING'
   | 'FORBIDDEN'
   | 'CSRF_FAILED'
   | 'NOT_FOUND'
@@ -64,6 +65,8 @@ export const Errors = {
     new AppError(403, 'EMAIL_NOT_VERIFIED', 'Please verify your email address. We can send the link again.'),
   suspended: () =>
     new AppError(403, 'ACCOUNT_SUSPENDED', 'This account is suspended. Contact the campus office if this is a mistake.'),
+  approvalPending: (role: string) =>
+    new AppError(403, 'APPROVAL_PENDING', `Your ${role === 'expert' ? 'industry expert' : 'faculty'} account is waiting for approval. We will email you as soon as your college approves it.`),
   forbidden: (message = 'You do not have permission to do that.') => new AppError(403, 'FORBIDDEN', message),
   csrf: () => new AppError(403, 'CSRF_FAILED', 'This request could not be verified. Refresh the page and try again.'),
   notFound: (what = 'This item') => new AppError(404, 'NOT_FOUND', `${what} was not found.`),

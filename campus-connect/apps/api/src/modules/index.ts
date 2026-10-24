@@ -21,6 +21,7 @@ import { notificationRoutes } from './notifications/notifications.routes.js';
 import { opportunityRoutes } from './opportunities/opportunities.routes.js';
 import { resourceRoutes } from './resources/resources.routes.js';
 import { spaceRoutes } from './spaces/spaces.routes.js';
+import { statusRoutes } from './status/status.routes.js';
 import { surveyRoutes } from './surveys/surveys.routes.js';
 import { feedbackRoutes } from './feedback/feedback.routes.js';
 import { userRoutes } from './users/users.routes.js';
@@ -51,6 +52,7 @@ export const modules: ModuleDefinition[] = [
   { name: 'lost_found', prefix: '/v1/lost-found', plugin: lostFoundRoutes },
   { name: 'marketplace', prefix: '/v1/listings', plugin: marketplaceRoutes },
   { name: 'chats', prefix: '/v1', plugin: chatRoutes },
+  { name: 'status', prefix: '/v1/status', plugin: statusRoutes },
   { name: 'realtime', prefix: '/v1/realtime', plugin: realtimeRoutes },
   { name: 'search', prefix: '/v1/search', plugin: searchRoutes },
   { name: 'reports', prefix: '/v1/reports', plugin: reportRoutes },

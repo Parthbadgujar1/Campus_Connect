@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, use, useState } from 'react';
-import { Check, Hash, Lock, LogOut, MessageCircle, Pin, Plus, Shield, UserMinus, Users, X } from 'lucide-react';
+import { Check, Hash, Lock, LogOut, MessageCircle, MessagesSquare, Pin, Plus, Shield, UserMinus, Users, X } from 'lucide-react';
 import { del, get, post, withQuery } from '@/lib/api/client';
 import { invalidate, useAction, useInfinite, useQuery, type Page } from '@/lib/api/hooks';
 import type { DiscussionSummary } from '@/lib/api/types';
@@ -152,6 +152,12 @@ function SpaceInner({ slug }: { slug: string }) {
   });
   const s = q.data;
   const member = s?.membership?.status === 'active';
+  // Every space has a group chat (like a WhatsApp community); opening it adds you to it.
+  const openChat = useAction(async () => {
+    const r = await post<{ chatId: string }>(`/spaces/${q.data!.id}/chat`);
+    invalidate('chats:list');
+    router.push(`/chats/${r.chatId}`);
+  });
   const tabs: Array<{ value: Tab; label: string }> = [
     { value: 'board', label: 'Board' },
     { value: 'posts', label: 'Posts' },
@@ -180,6 +186,7 @@ function SpaceInner({ slug }: { slug: string }) {
                 {member ? (
                   <>
                     <Button onClick={() => setWriting(true)}><Plus className="h-4 w-4" aria-hidden="true" /> New discussion</Button>
+                    <Button variant="secondary" onClick={() => void openChat.run()} disabled={openChat.pending}>{openChat.pending ? <Spinner /> : <MessagesSquare className="h-4 w-4" aria-hidden="true" />} Group chat</Button>
                     {s.membership?.role !== 'owner' && <Button variant="ghost" onClick={() => void leave.run()} disabled={leave.pending}><LogOut className="h-4 w-4" aria-hidden="true" /> Leave</Button>}
                   </>
                 ) : s.membership?.status === 'pending' ? (
@@ -190,7 +197,7 @@ function SpaceInner({ slug }: { slug: string }) {
                   <Button onClick={() => void join.run()} disabled={join.pending || s.status !== 'active'}>{join.pending ? <Spinner /> : <Plus className="h-4 w-4" aria-hidden="true" />}{s.privacy === 'private' ? 'Ask to join' : 'Join'}</Button>
                 )}
               </div>
-              {(join.error || leave.error) && <FormAlert className="mt-3">{(join.error ?? leave.error)!.message}</FormAlert>}
+              {(join.error || leave.error || openChat.error) && <FormAlert className="mt-3">{(join.error ?? leave.error ?? openChat.error)!.message}</FormAlert>}
             </div>
           </Card>
           {!s.canRead ? (

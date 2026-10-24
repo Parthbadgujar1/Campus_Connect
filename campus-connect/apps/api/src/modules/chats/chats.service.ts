@@ -131,6 +131,7 @@ export interface MessageView {
   reactions: Array<{ emoji: string; count: number; mine: boolean }>;
   responses: { counts: Record<string, number>; mine: string | null } | null;
   edited: boolean;
+  forwarded: boolean;
   deleted: boolean;
   createdAt: string;
 }
@@ -206,6 +207,7 @@ export async function toMessageViews(deps: Deps, viewerId: string, chat: Pick<Ch
           ? { counts: Object.fromEntries(resp.map((x) => [x._id.r, x.n])), mine: resp.find((x) => x.mine === 1)?._id.r ?? null }
           : null,
       edited: Boolean(r.editedAt),
+      forwarded: Boolean(r.forwarded),
       deleted,
       createdAt: r.createdAt.toISOString(),
     };
