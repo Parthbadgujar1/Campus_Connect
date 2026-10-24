@@ -1,0 +1,12 @@
+**/node_modules
+**/.next
+**/.next-*
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+.git
+apps/api/.env
+apps/api/var
+apps/api/seed-assets
+**/.env
+**/.env.local

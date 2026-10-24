@@ -15,6 +15,7 @@
     "lint": "tsc --noEmit",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
+    "db:bootstrap": "tsx scripts/bootstrap.ts",
     "db:reset": "tsx scripts/db-reset.ts",
     "smoke": "tsx scripts/smoke.ts"
   },

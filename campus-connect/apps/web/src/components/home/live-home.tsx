@@ -9,7 +9,7 @@ import { AmbienceButton } from '@/components/shell/ambience';
 import { UnderlineTabs } from '@/components/ui/chip';
 import { SectionHeader } from '@/components/ui/layout';
 import { StatusStrip } from '@/components/status/status';
-import { CampusFinds, greeting, LoopsStrip, PlayAndAsk, SpacesStrip, UpNext } from './home-sections';
+import { CampusFinds, greeting, LoopsStrip, PlayAndAsk, QuickChips, Reveal, SpacesStrip, UpNext } from './home-sections';
 import { ErrorState, LoadMore, SkeletonList } from '@/components/ui/states';
 import { get } from '@/lib/api/client';
 import { useInfinite, useQuery, type Page } from '@/lib/api/hooks';
@@ -187,12 +187,13 @@ export function LiveHome() {
       <StatusStrip />
 
       <div className="mt-6 space-y-9">
+        <Reveal index={0}><QuickChips /></Reveal>
         <StaffTools />
-        <UpNext />
-        <LoopsStrip />
-        <SpacesStrip />
-        <PlayAndAsk />
-        <CampusFinds />
+        <Reveal index={1}><UpNext /></Reveal>
+        <Reveal index={2}><LoopsStrip /></Reveal>
+        <Reveal index={3}><SpacesStrip /></Reveal>
+        <Reveal index={4}><PlayAndAsk /></Reveal>
+        <Reveal index={5}><CampusFinds /></Reveal>
         <Suspense fallback={<SkeletonList count={2} />}>
           <Feed />
         </Suspense>

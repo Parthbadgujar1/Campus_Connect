@@ -51,6 +51,10 @@ mongosh --eval "rs.initiate()"
 
 Admin → System shows whether the database is a replica set.
 
+## Deploy
+
+Railway setup (Dockerfiles, variables, first admin): see [RAILWAY.md](RAILWAY.md).
+
 ## Checks
 
 ```bash
