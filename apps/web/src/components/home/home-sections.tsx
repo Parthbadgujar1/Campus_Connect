@@ -41,7 +41,7 @@ export function Reveal({ index, children }: { index: number; children: ReactNode
 
 const CHIPS = [
   { href: '/loops', label: 'Loops', icon: Play, tone: 'bg-[#302675] text-white' },
-  { href: '/spaces', label: 'Spaces', icon: Users, tone: 'bg-[#b8f28b] text-[#13112a]' },
+  { href: '/spaces', label: 'Spaces', icon: Users, tone: 'bg-[#b8f28b] text-[#0a0a0a]' },
   { href: '/hush', label: 'Hush', icon: Flame, tone: 'bg-[#ffd9a8] text-[#3a2208]' },
   { href: '/games/quiz', label: 'Quiz', icon: Gamepad2, tone: 'bg-[#d9d2f7] text-[#241a5c]' },
   { href: '/events', label: 'Events', icon: CalendarDays, tone: 'bg-[#bfdbfe] text-[#12306b]' },
@@ -119,7 +119,7 @@ export function UpNext() {
         <span className="relative mt-3 block max-w-[85%] text-[26px] font-bold leading-[1.1] tracking-tight">{first.title}</span>
         <span className="relative mt-2 block text-[13px] text-white/75">{first.organizerName} · {first.venue} · {time(first.startsAt)}</span>
         <span className="relative mt-4 flex items-center gap-2">
-          <span className="font-sans rounded-full bg-[#b8f28b] px-3.5 py-1.5 text-[13px] font-bold text-[#13112a]">{first.myRsvp === 'going' ? 'View event' : 'See details'}</span>
+          <span className="font-sans rounded-full bg-[#b8f28b] px-3.5 py-1.5 text-[13px] font-bold text-[#0a0a0a]">{first.myRsvp === 'going' ? 'View event' : 'See details'}</span>
           <span className="font-sans text-[12px] text-white/70">{first.goingCount} going</span>
         </span>
       </Link>
@@ -127,7 +127,7 @@ export function UpNext() {
       {(second || closing) && (
         <div className="grid grid-cols-2 gap-3">
           {second && md ? (
-            <Link href={`/events/${second.id}`} className="press flex min-h-[168px] flex-col justify-between rounded-[24px] bg-[#b8f28b] p-4 text-[#13112a]">
+            <Link href={`/events/${second.id}`} className="press flex min-h-[168px] flex-col justify-between rounded-[24px] bg-[#b8f28b] p-4 text-[#0a0a0a]">
               <span className="flex items-start justify-between">
                 <span className="leading-none">
                   <span className="font-sans block text-[12px] font-bold uppercase tracking-widest">{md.month}</span>
@@ -239,7 +239,7 @@ export function PlayAndAsk() {
   const top = hush.data?.items[count ? turn % count : 0];
   return (
     <section aria-label="Play and ask" className="grid grid-cols-2 gap-3">
-      <Link href="/games/quiz" className="press flex min-h-[176px] flex-col justify-between rounded-[24px] bg-[#b8f28b] p-4 text-[#13112a]">
+      <Link href="/games/quiz" className="press flex min-h-[176px] flex-col justify-between rounded-[24px] bg-[#b8f28b] p-4 text-[#0a0a0a]">
         <span className="flex items-center justify-between">
           <span className="font-sans text-[12px] font-bold uppercase tracking-widest">Daily quiz</span>
           <Gamepad2 className="animate-float h-6 w-6" aria-hidden="true" />
@@ -277,7 +277,7 @@ export function CampusFinds() {
   return (
     <section aria-label="Lost and found, and marketplace" className="grid grid-cols-2 gap-3">
       {l ? (
-        <Link href={`/lost-found?id=${l.id}`} className="press flex min-h-[150px] flex-col justify-between rounded-[24px] bg-[#25214a] p-4 text-white">
+        <Link href={`/lost-found?id=${l.id}`} className="press flex min-h-[150px] flex-col justify-between rounded-[24px] bg-[#1c1c1c] p-4 text-white">
           <span className="font-sans flex items-center justify-between text-[12px] font-bold uppercase tracking-widest text-[#ffb4a2]">
             {l.kind === 'lost' ? 'Lost' : 'Found'}
             <Search className="h-4 w-4" aria-hidden="true" />

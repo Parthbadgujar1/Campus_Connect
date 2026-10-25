@@ -20,10 +20,10 @@ interface ThemeOption {
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
-  { value: 'system', label: 'Auto', hint: 'Pro by day, Night after dark', icon: SunMoon, swatch: ['linear-gradient(135deg,#f6f4ff 50%,#13112a 50%)', '#ffffff', '#302675'] },
+  { value: 'system', label: 'Auto', hint: 'Pro by day, Night after dark', icon: SunMoon, swatch: ['linear-gradient(135deg,#f6f4ff 50%,#000000 50%)', '#ffffff', '#302675'] },
   { value: 'pro', label: 'Pro', hint: 'The CampusConnect look: crisp and bold', icon: Sparkles, swatch: ['#f6f4ff', '#302675', '#b8f28b'] },
   { value: 'day', label: 'Doodle', hint: 'Notebook paper, stickers and highlighters', icon: PenLine, swatch: ['#fffdf5', '#e9defd', '#b8f28b'] },
-  { value: 'night', label: 'Night', hint: 'Pro after dark, deep and restful', icon: Moon, swatch: ['#13112a', '#1c1939', '#b8f28b'] },
+  { value: 'night', label: 'Night', hint: 'Pure black, easy on the eyes', icon: Moon, swatch: ['#000000', '#1c1c1c', '#b8f28b'] },
   { value: 'paper', label: 'Paper', hint: 'Reading mode, warm and still', icon: BookOpen, swatch: ['#f4eee2', '#fcf9f2', '#8a5a3b'] },
 ];
 
