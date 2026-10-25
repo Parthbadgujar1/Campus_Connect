@@ -47,10 +47,11 @@ function topicsFor(request: FastifyRequest): LiveTopic[] {
 }
 
 const WRITE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-const FLUSH_MS = 1000;
-// Live conversations (Hush answers and votes) are announced almost at once; other areas are batched.
+// A change is announced within a tenth of a second; changes arriving in that moment share one signal.
+const FLUSH_MS = 120;
+// Live conversations (Hush, statuses) go out even sooner.
 const FAST_TOPICS = new Set<LiveTopic>(['hush', 'status']);
-const FAST_MS = 100;
+const FAST_MS = 60;
 
 const liveChanges: FastifyPluginAsync = async (app) => {
   const pending = new Map<string, Set<LiveTopic>>();

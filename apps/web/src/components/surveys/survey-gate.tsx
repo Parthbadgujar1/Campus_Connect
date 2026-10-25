@@ -9,6 +9,7 @@ import { ClipboardCheck, LogOut } from 'lucide-react';
 import { get } from '@/lib/api/client';
 import { invalidate, useQuery } from '@/lib/api/hooks';
 import type { SurveyView } from '@/lib/api/modules';
+import { lockScroll } from '@/lib/scroll-lock';
 import { useSession } from '@/lib/session';
 import { AnimatePresence, motion } from '@/components/motion';
 import { useToast } from '@/components/ui/toast';
@@ -32,11 +33,7 @@ export function SurveyGate() {
 
   useEffect(() => {
     if (!due) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previous;
-    };
+    return lockScroll();
   }, [due]);
 
   return (

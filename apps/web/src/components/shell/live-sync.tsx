@@ -43,12 +43,11 @@ export function LiveSync() {
   };
   const queue = (topics: string[]) => {
     topics.forEach((t) => pending.current.add(t));
-    // Hush (a live conversation) refreshes almost at once; other areas wait a moment so a burst of
-    // changes becomes one refresh.
+    // Refresh almost at once; changes that arrive together still become one refresh.
     if (topics.includes('hush') || topics.includes('status')) {
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(apply, 60);
-    } else timer.current ??= setTimeout(apply, 400);
+      timer.current = setTimeout(apply, 40);
+    } else timer.current ??= setTimeout(apply, 90);
   };
 
   useLive(null, (e) => {

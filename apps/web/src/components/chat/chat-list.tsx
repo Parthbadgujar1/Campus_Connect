@@ -126,7 +126,7 @@ export function ChatList() {
         refreshTimer.current = null;
         invalidate('chats:list');
         refreshBadges();
-      }, 1200);
+      }, 350);
     }
   });
   // Lists also refresh on a timer, in case the live connection is down.

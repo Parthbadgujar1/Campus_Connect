@@ -3,6 +3,7 @@
 import { useEffect, useId, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { lockScroll } from '@/lib/scroll-lock';
 
 /**
  * Frosted sheet that glides up from the bottom on phones and floats in the centre
@@ -27,14 +28,13 @@ export function Sheet({
 
   useEffect(() => {
     if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockScroll();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      unlock();
       window.removeEventListener('keydown', onKey);
     };
   }, [open, onClose]);

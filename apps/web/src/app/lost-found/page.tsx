@@ -73,8 +73,10 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
     item.reload();
     invalidate('lostfound:list');
   });
+  const reporterId = item.data?.reporter.id;
   const message = useAction(async () => {
-    const r = await post<{ chatId: string }>('/chats/direct', { userId: item.data!.reporter.id });
+    if (!reporterId) return;
+    const r = await post<{ chatId: string }>('/chats/direct', { userId: reporterId });
     router.push(`/chats/${r.chatId}`);
   });
   const it = item.data;

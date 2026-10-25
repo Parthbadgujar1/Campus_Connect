@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Download, Forward, X } from 'lucide-react';
 import type { FileView } from '@/lib/api/types';
+import { lockScroll } from '@/lib/scroll-lock';
 import { time, day } from '@/lib/live-time';
 
 export interface ViewerItem {
@@ -28,11 +29,10 @@ export function MediaViewer({ items, start, onClose, onForward }: { items: Viewe
       if (e.key === 'ArrowRight') go(1);
     };
     window.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlock = lockScroll();
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      unlock();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { SectionBoundary } from '@/components/common/section-boundary';
+import { releaseStaleScrollLock } from '@/lib/scroll-lock';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, Hourglass, Lock, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
@@ -34,6 +35,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { status, user, settings, refresh, updateSettings } = useSession();
   const isPublic = PUBLIC.test(pathname);
+  // A new page always starts scrollable, even if a pop-up on the last one left a lock behind.
+  useEffect(() => {
+    releaseStaleScrollLock();
+  }, [pathname]);
   const onboardingDone = !settings || settings.onboarding.completed || settings.onboarding.skipped;
   const [tourOpen, setTourOpen] = useState(false);
 

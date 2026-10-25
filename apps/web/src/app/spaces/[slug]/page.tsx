@@ -139,14 +139,19 @@ function SpaceInner({ slug }: { slug: string }) {
   const [writing, setWriting] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const q = useQuery<SpaceDetail>(`spaces:one:${slug}`, (signal) => get(`/spaces/${slug}`, undefined, signal));
+  // Read with ?. so nothing breaks while the space is still loading.
+  const spaceId = q.data?.id;
+  const spaceName = q.data?.name ?? 'the space';
   const join = useAction(async () => {
-    const r = await post<{ status: string }>(`/spaces/${q.data!.id}/join`);
-    toast(r.status === 'pending' ? 'Request sent to the space owners' : `You joined ${q.data!.name}`);
+    if (!spaceId) return;
+    const r = await post<{ status: string }>(`/spaces/${spaceId}/join`);
+    toast(r.status === 'pending' ? 'Request sent to the space owners' : `You joined ${spaceName}`);
     q.reload();
     invalidate('spaces:list');
   });
   const leave = useAction(async () => {
-    await del(`/spaces/${q.data!.id}/membership`);
+    if (!spaceId) return;
+    await del(`/spaces/${spaceId}/membership`);
     toast('You left the space');
     setLeaving(false);
     q.reload();
@@ -157,7 +162,8 @@ function SpaceInner({ slug }: { slug: string }) {
   const member = s?.membership?.status === 'active';
   // Every space has a group chat (like a WhatsApp community); opening it adds you to it.
   const openChat = useAction(async () => {
-    const r = await post<{ chatId: string }>(`/spaces/${q.data!.id}/chat`);
+    if (!spaceId) return;
+    const r = await post<{ chatId: string }>(`/spaces/${spaceId}/chat`);
     invalidate('chats:list');
     router.push(`/chats/${r.chatId}`);
   });
