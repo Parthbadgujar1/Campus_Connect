@@ -107,7 +107,7 @@ export default function DiscoverPage() {
         <section className="mt-9" aria-label="Top discussions">
           <SectionHeader title="On the boards" action={{ label: 'All boards', href: '/spaces' }} />
           <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
-            {boards.data.items.map((d) => (
+            {boards.data.items.filter((d) => d.space?.slug).map((d) => (
               <li key={d.id}>
                 <Link href={`/spaces/${d.space.slug}/t/${d.id}`} className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2">
                   <span className="min-w-0 flex-1">

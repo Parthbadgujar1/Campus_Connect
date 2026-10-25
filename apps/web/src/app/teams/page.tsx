@@ -89,7 +89,7 @@ export default function TeamsPage() {
       {list.data && list.data.items.length > 0 && (
         <>
           <Stagger className="space-y-3">
-            {list.data.items.map((d) => (
+            {list.data.items.filter((d) => d.space?.slug).map((d) => (
               <StaggerItem key={d.id}>
                 <Pressable>
                   <Link href={`/spaces/${d.space.slug}/t/${d.id}`} className="flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 transition-colors hover:border-accent/40">
@@ -97,7 +97,7 @@ export default function TeamsPage() {
                       <span className="block font-semibold leading-snug">{d.title}</span>
                       {d.excerpt && <span className="mt-1 line-clamp-2 block text-[14px] text-text-2">{d.excerpt}</span>}
                       <span className="mt-1.5 flex flex-wrap items-center gap-x-3 text-[12px] text-text-3">
-                        <span>{d.author.displayName}</span>
+                        <span>{d.author?.displayName ?? 'Someone'}</span>
                         <span>{d.space.name}</span>
                         <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" aria-hidden="true" />{d.commentsCount}</span>
                         <span>{ago(d.createdAt)}</span>

@@ -51,7 +51,7 @@ function Boards() {
   if (!q.data!.items.length) return <p className="rounded-2xl border border-dashed border-border p-5 text-center text-[14px] text-text-3">Join a space to see its discussions here. <Link href="/spaces" className="font-semibold text-accent">Browse spaces</Link></p>;
   return (
     <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
-      {q.data!.items.map((t) => (
+      {q.data!.items.filter((t) => t.space?.slug).map((t) => (
         <li key={t.id}>
           <Link href={`/spaces/${t.space.slug}/t/${t.id}`} className="flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-surface-2">
             <span className="flex w-10 shrink-0 flex-col items-center text-text-2">
@@ -59,7 +59,7 @@ function Boards() {
               <span className="text-[13px] font-semibold">{t.score}</span>
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13px] text-text-3">{t.space.name} · {t.author.displayName.split(' ')[0]} · {t.commentsCount} replies</span>
+              <span className="block text-[13px] text-text-3">{t.space.name} · {t.author?.displayName?.split(' ')[0] ?? 'Someone'} · {t.commentsCount} replies</span>
               <span className="line-clamp-2 block text-[15px] font-semibold leading-snug">{t.title}</span>
             </span>
           </Link>

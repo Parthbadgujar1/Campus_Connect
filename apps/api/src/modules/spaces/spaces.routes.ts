@@ -449,7 +449,7 @@ export const spaceRoutes: FastifyPluginAsync = async (base) => {
       const spaceBy = new Map(spaceRows.map((x) => [x._id, x]));
       const mySet = new Set(mySpaceIds);
       return {
-        items: rows.map((r) => ({
+        items: rows.filter((r) => spaceBy.has(r.spaceId)).map((r) => ({
           id: r._id,
           title: r.title,
           excerpt: r.body.slice(0, 200),
