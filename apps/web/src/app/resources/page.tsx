@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, BookMarked, Check, ChevronRight, Download, ExternalLink, FileText, FolderOpen, GraduationCap, Layers, Link2, Plus, Search, Star, Upload } from 'lucide-react';
 import { del, get, post, put, upload, withQuery } from '@/lib/api/client';
+import { openInNewTab } from '@/lib/open-link';
 import { invalidate, useAction, useInfinite, useQuery, type Page } from '@/lib/api/hooks';
 import type { ResourceView, ShelfFilters, SubjectView } from '@/lib/api/modules';
 import type { FileView } from '@/lib/api/types';
@@ -83,8 +84,9 @@ function StepCard({ title, subtitle, count, onClick, icon: Icon }: { title: stri
 function ResourceCard({ r, onChanged }: { r: ResourceView; onChanged: (next: ResourceView) => void }) {
   const toast = useToast();
   const open = useAction(async () => {
-    const res = await post<{ url: string | null; external: boolean }>(`/resources/${r.id}/download`);
-    if (res.url) window.open(res.url, '_blank', 'noopener,noreferrer');
+    // The tab is opened on click and pointed at the link when it arrives, so popup blockers allow it.
+    const url = await openInNewTab(async () => (await post<{ url: string | null; external: boolean }>(`/resources/${r.id}/download`)).url);
+    if (!url) return;
     onChanged({ ...r, downloadsCount: r.isMine ? r.downloadsCount : r.downloadsCount + 1 });
   });
   const rate = useAction(async (n: number) => {
