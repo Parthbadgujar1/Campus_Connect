@@ -161,8 +161,10 @@ export const hushRoutes: FastifyPluginAsync = async (base) => {
         await answers().insertOne(answer, { session });
         await questions().updateOne({ _id: h._id }, { $inc: { answersCount: 1 } }, { session });
       });
-      const asker = await ownerOf('hush_question', h._id);
-      if (asker && asker !== auth.userId) {
+      // The asker is told afterwards, so the answer appears for everyone without waiting for that.
+      void (async () => {
+        const asker = await ownerOf('hush_question', h._id);
+        if (!asker || asker === auth.userId) return;
         await app.deps.notifier.send({
           userId: asker,
           kind: 'reply',
@@ -174,7 +176,7 @@ export const hushRoutes: FastifyPluginAsync = async (base) => {
           entityType: 'hush_question',
           entityId: h._id,
         });
-      }
+      })().catch((err) => app.log.warn({ err: (err as Error).message }, 'hush notification failed'));
       return reply.status(201).send({ id: answer._id });
     },
   );

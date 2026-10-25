@@ -9,7 +9,7 @@ import { decodeCursor, encodeCursor, page, pageQuery } from '../../core/paginati
 import { lowerThan, newerThan, olderThan } from '../../core/query.js';
 import { boolQuery, cleanText, idParam, tags, tagsPatch, text, uuid } from '../../core/validation.js';
 import { uuidv7 } from '../../infra/db/ids.js';
-import type { Comment, Post } from '../../infra/db/models.js';
+import type { Comment, Post, PostLike } from '../../infra/db/models.js';
 import { limits } from '../../plugins/traffic.js';
 import type { AuthContext } from '../../types/fastify.js';
 import { assertOwnFiles } from '../files/files.service.js';
@@ -285,6 +285,73 @@ export const feedRoutes: FastifyPluginAsync = async (base) => {
     return { status: 'deleted' };
   });
 
+  // Likes on comments, like Instagram's hearts beside each comment.
+  async function likeableComment(auth: AuthContext, id: string) {
+    const c = await db.col('comments').findOne({ _id: id, status: 'published', deletedAt: null });
+    if (!c) throw Errors.notFound('This comment');
+    await visiblePost(c.postId, auth); // you can like it only if you can see its post
+    return c;
+  }
+
+  app.put('/comments/:id/like', { config: limits.write, schema: { tags: ['feed'], summary: 'Like a comment', params: idParam } }, async (request) => {
+    const auth = requireAuth(request);
+    const c = await likeableComment(auth, request.params.id);
+    const res = await db.col('comment_likes').updateOne(
+      { _id: `${c._id}:${auth.userId}` },
+      { $setOnInsert: { commentId: c._id, postId: c.postId, userId: auth.userId, createdAt: new Date() } },
+      { upsert: true },
+    );
+    let likesCount = c.likesCount ?? 0;
+    if (res.upsertedCount) {
+      const updated = await db.col('comments').findOneAndUpdate({ _id: c._id }, { $inc: { likesCount: 1 } }, { returnDocument: 'after', projection: { likesCount: 1 } });
+      likesCount = updated?.likesCount ?? likesCount + 1;
+      const owner = c.authorId;
+      if (owner && owner !== auth.userId) {
+        await app.deps.notifier
+          .send({ userId: owner, kind: 'like', title: `${auth.displayName} liked your comment`, body: c.body.slice(0, 140), link: `/post/${c.postId}`, actorId: auth.userId, entityType: 'comment', entityId: c._id })
+          .catch(() => undefined);
+      }
+    }
+    return { liked: true, likesCount };
+  });
+
+  app.delete('/comments/:id/like', { config: limits.write, schema: { tags: ['feed'], summary: 'Unlike a comment', params: idParam } }, async (request) => {
+    const auth = requireAuth(request);
+    const c = await likeableComment(auth, request.params.id);
+    const res = await db.col('comment_likes').deleteOne({ _id: `${c._id}:${auth.userId}` });
+    const updated = res.deletedCount
+      ? await db.col('comments').findOneAndUpdate({ _id: c._id, likesCount: { $gt: 0 } }, { $inc: { likesCount: -1 } }, { returnDocument: 'after', projection: { likesCount: 1 } })
+      : await db.col('comments').findOne({ _id: c._id }, { projection: { likesCount: 1 } });
+    return { liked: false, likesCount: updated?.likesCount ?? 0 };
+  });
+
+  // "Liked by": the people who liked a post or loop, newest first.
+  app.get('/posts/:id/likes', { schema: { tags: ['feed'], summary: 'Who liked this post', params: idParam, querystring: pageQuery } }, async (request) => {
+    const auth = requireAuth(request);
+    const post = await visiblePost(request.params.id, auth);
+    const blocked = await blockedIds(db, auth.userId);
+    const rows = await db
+      .col('post_likes')
+      .find({ $and: [{ postId: post._id }, blocked.length ? { userId: { $nin: blocked } } : {}, olderThan('createdAt', decodeCursor(request.query.cursor)) as Filter<PostLike>] })
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(request.query.limit + 1)
+      .toArray();
+    const { items, nextCursor } = page(rows, request.query.limit, (r) => encodeCursor(r.createdAt, r._id));
+    const [people, following] = await Promise.all([
+      loadPeople(app.deps, items.map((l) => l.userId)),
+      db.col('follows').find({ _id: { $in: items.map((l) => `${auth.userId}:${l.userId}`) } }, { projection: { followeeId: 1 } }).toArray(),
+    ]);
+    const followSet = new Set(following.map((f) => f.followeeId));
+    return {
+      items: items.flatMap((l) => {
+        const p = people.get(l.userId);
+        return p ? [{ ...p, isFollowing: followSet.has(l.userId), isMe: l.userId === auth.userId }] : [];
+      }),
+      nextCursor,
+      total: post.likesCount,
+    };
+  });
+
   app.put('/posts/:id/like', { config: limits.write, schema: { tags: ['feed'], summary: 'Like a post', params: idParam } }, async (request) => {
     const auth = requireAuth(request);
     const post = await visiblePost(request.params.id, auth);
@@ -379,10 +446,14 @@ export const feedRoutes: FastifyPluginAsync = async (base) => {
         anonIds.length ? db.col('anonymous_authors').find({ _id: { $in: anonIds }, userId: auth.userId }, { projection: { contentId: 1 } }).toArray() : Promise.resolve([]),
       ]);
       const mineAnon = new Set(mine.map((m) => m.contentId));
+      const likedRows = items.length ? await db.col('comment_likes').find({ _id: { $in: items.map((c) => `${c._id}:${auth.userId}`) } }, { projection: { commentId: 1 } }).toArray() : [];
+      const likedBy = new Set(likedRows.map((l) => l.commentId));
       return {
         items: items.map((c) => ({
           id: c._id,
           parentId: c.parentId,
+          likesCount: c.deletedAt ? 0 : (c.likesCount ?? 0),
+          liked: likedBy.has(c._id),
           // Deleted comments keep their place in a thread so replies still make sense.
           body: c.deletedAt ? null : c.body,
           deleted: Boolean(c.deletedAt),

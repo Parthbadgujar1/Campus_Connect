@@ -8,6 +8,7 @@ import { LivePostCard } from '@/components/feed/live-post-card';
 import { AmbienceButton } from '@/components/shell/ambience';
 import { UnderlineTabs } from '@/components/ui/chip';
 import { SectionHeader } from '@/components/ui/layout';
+import { SectionBoundary } from '@/components/common/section-boundary';
 import { StatusStrip } from '@/components/status/status';
 import { CampusFinds, greeting, LoopsStrip, PlayAndAsk, QuickChips, Reveal, SpacesStrip, UpNext } from './home-sections';
 import { ErrorState, LoadMore, SkeletonList } from '@/components/ui/states';
@@ -146,7 +147,9 @@ function Feed() {
           </p>
         )}
         {feed.items.map((p) => (
-          <LivePostCard key={p.id} post={p} onChange={change} onRemove={remove} />
+          <SectionBoundary key={p.id} label="This post" compact>
+            <LivePostCard post={p} onChange={change} onRemove={remove} />
+          </SectionBoundary>
         ))}
         {feed.error && feed.items.length > 0 && <ErrorState compact error={feed.error} onRetry={feed.loadMore} />}
         <LoadMore hasMore={feed.hasMore} loading={feed.loadingMore} onClick={feed.loadMore} label="Show more posts" />
@@ -182,27 +185,37 @@ export function LiveHome() {
         </div>
       </header>
 
-      <StatusStrip />
+      <SectionBoundary label="Stories" compact>
+        <StatusStrip />
+      </SectionBoundary>
 
       <div className="mt-6 space-y-9">
         <Reveal index={0}><QuickChips /></Reveal>
-        <StaffTools />
+        <SectionBoundary label="Your tools" compact>
+          <StaffTools />
+        </SectionBoundary>
         <Reveal index={1}><UpNext /></Reveal>
         <Reveal index={2}><LoopsStrip /></Reveal>
         <Reveal index={3}><SpacesStrip /></Reveal>
         <Reveal index={4}><PlayAndAsk /></Reveal>
         <Reveal index={5}><CampusFinds /></Reveal>
         <Suspense fallback={<SkeletonList count={2} />}>
-          <Feed />
+          <SectionBoundary label="The feed">
+            <Feed />
+          </SectionBoundary>
         </Suspense>
         <div className="grid gap-9 md:grid-cols-2">
           <section aria-label="Notices">
             <SectionHeader tone="blue" title="Notices" action={{ label: 'All notices', href: '/news' }} />
-            <Notices />
+            <SectionBoundary label="Notices">
+              <Notices />
+            </SectionBoundary>
           </section>
           <section aria-label="Boards">
             <SectionHeader tone="blue" title="Boards" description="Top discussions from your spaces" action={{ label: 'Open boards', href: '/spaces' }} />
-            <Boards />
+            <SectionBoundary label="Boards">
+              <Boards />
+            </SectionBoundary>
           </section>
         </div>
       </div>

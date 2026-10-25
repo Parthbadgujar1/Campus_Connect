@@ -48,13 +48,18 @@ function topicsFor(request: FastifyRequest): LiveTopic[] {
 
 const WRITE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const FLUSH_MS = 1000;
+// Live conversations (Hush answers and votes) are announced almost at once; other areas are batched.
+const FAST_TOPICS = new Set<LiveTopic>(['hush', 'status']);
+const FAST_MS = 100;
 
 const liveChanges: FastifyPluginAsync = async (app) => {
   const pending = new Map<string, Set<LiveTopic>>();
   let timer: NodeJS.Timeout | undefined;
+  let timerDue = 0;
 
   const flush = () => {
     timer = undefined;
+    timerDue = 0;
     for (const [collegeId, topics] of pending) app.deps.realtime.toAll({ type: 'changed', collegeId, topics: [...topics] });
     pending.clear();
   };
@@ -68,7 +73,13 @@ const liveChanges: FastifyPluginAsync = async (app) => {
     const set = pending.get(collegeId) ?? new Set<LiveTopic>();
     topics.forEach((t) => set.add(t));
     pending.set(collegeId, set);
-    timer ??= setTimeout(flush, FLUSH_MS);
+    const wait = topics.some((t) => FAST_TOPICS.has(t)) ? FAST_MS : FLUSH_MS;
+    const due = Date.now() + wait;
+    if (!timer || due < timerDue) {
+      if (timer) clearTimeout(timer);
+      timerDue = due;
+      timer = setTimeout(flush, wait);
+    }
   });
 
   app.addHook('onClose', async () => {

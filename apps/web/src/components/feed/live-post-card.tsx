@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Bookmark, Copy, Download, Ellipsis, FileText, Flag, Ghost, Heart, MessageCircle, Pencil, Pin, Send, Trash2 } from 'lucide-react';
 import { ReportSheet } from '@/components/common/report-sheet';
+import { LikedBySheet } from '@/components/loops/liked-by-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/fields';
@@ -74,6 +75,7 @@ export function Attachments({ files, poster }: { files: FileView[]; poster?: str
 
 export function LivePostCard({ post, onChange, onRemove, detailed = false }: { post: PostView; onChange: (p: PostView) => void; onRemove: (id: string) => void; detailed?: boolean }) {
   const toast = useToast();
+  const [likers, setLikers] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(post.body);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -260,6 +262,9 @@ export function LivePostCard({ post, onChange, onRemove, detailed = false }: { p
           <Heart className={cn('h-[18px] w-[18px]', post.liked && 'fill-current')} aria-hidden="true" />
           <span className="tabular-nums">{post.likesCount.toLocaleString('en-IN')}</span>
         </button>
+        {post.likesCount > 0 && (
+          <button type="button" onClick={() => setLikers(true)} className="press h-10 rounded-full px-2 text-[13px] font-semibold text-text-3 hover:text-text hover:underline">Liked by</button>
+        )}
         <Link href={link} aria-label={`Replies, ${post.commentsCount}`} className="press flex h-10 items-center gap-2 rounded-full px-3.5 text-sm font-semibold text-text-2 hover:bg-surface-2 hover:text-text">
           <MessageCircle className="h-[18px] w-[18px]" aria-hidden="true" />
           {post.commentsCount}
@@ -290,6 +295,7 @@ export function LivePostCard({ post, onChange, onRemove, detailed = false }: { p
         pending={deleting}
       />
       <ReportSheet open={reporting} onClose={() => setReporting(false)} targetType="post" targetId={post.id} label="this post" />
+      {likers && <LikedBySheet postId={post.id} total={post.likesCount} onClose={() => setLikers(false)} />}
     </article>
   );
 }

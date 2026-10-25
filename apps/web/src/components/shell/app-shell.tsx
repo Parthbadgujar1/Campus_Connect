@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { SectionBoundary } from '@/components/common/section-boundary';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { AlertTriangle, Hourglass, Lock, RefreshCw, ShieldCheck } from 'lucide-react';
 import { Avatar } from '@/components/ui/avatar';
@@ -128,7 +129,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <DeletionBanner />
         <PendingRoleBanner />
         <div key={areaKey} id="main-content" tabIndex={-1} className="animate-page outline-none">
-          <RoleGate pathname={pathname}>{children}</RoleGate>
+          <SectionBoundary label="This page" resetKey={pathname} className="m-4">
+            <RoleGate pathname={pathname}>{children}</RoleGate>
+          </SectionBoundary>
         </div>
       </div>
       {!fullscreen && <TabBar section={section} />}

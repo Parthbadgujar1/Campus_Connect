@@ -124,6 +124,8 @@ export interface CommentView {
   author: PersonSummary | null;
   byOriginalPoster: boolean;
   isMine: boolean;
+  likesCount?: number;
+  liked?: boolean;
   createdAt: string;
 }
 

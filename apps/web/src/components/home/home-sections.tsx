@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowUpRight, CalendarDays, Flame, Gamepad2, Play, Search, Tag, Users, Heart } from 'lucide-react';
 import { useAppState } from '@/lib/store';
+import { SectionBoundary } from '@/components/common/section-boundary';
 import { SectionHeader } from '@/components/ui/layout';
 import { Skeleton } from '@/components/ui/states';
 import { get } from '@/lib/api/client';
@@ -34,7 +35,7 @@ function useTick(ms: number) {
 export function Reveal({ index, children }: { index: number; children: ReactNode }) {
   return (
     <div className="animate-rise" style={{ animationDelay: `${Math.min(index, 8) * 70}ms` }}>
-      {children}
+      <SectionBoundary label="This section">{children}</SectionBoundary>
     </div>
   );
 }

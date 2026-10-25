@@ -29,6 +29,7 @@ import { AttachSheet, ContactSheet, MediaComposer, PollSheet, shareLocation, typ
 import { ChatInfoSheet, ChatSearchSheet, ForwardSheet, WALLPAPERS, presenceLabel } from './chat-sheets';
 import { MediaViewer, type ViewerItem } from './media-viewer';
 import { MessageActionSheet } from './message-actions';
+import { SectionBoundary } from '@/components/common/section-boundary';
 import { VoicePlayer, VoiceRecorder } from './voice';
 
 const QUICK = ['👍', '❤️', '😂', '🎉', '😮', '🙏'];
@@ -678,6 +679,7 @@ export function LiveConversation({ chatId }: { chatId: string }) {
                 return (
                   <div key={m.id}>
                     {sep && <p className="my-3 text-center"><span className="rounded-full bg-surface-solid/90 px-3 py-1 text-[12px] font-semibold text-text-3 shadow-card">{day(m.createdAt)}</span></p>}
+                    <SectionBoundary label="This message" compact>
                     <Bubble
                       m={m}
                       chat={c}
@@ -695,6 +697,7 @@ export function LiveConversation({ chatId }: { chatId: string }) {
                       onEditStarted={() => setEditId(null)}
                       onChange={(next) => setMessages((list) => (next ? list.map((x) => (x.id === next.id ? next : x)) : list.filter((x) => x.id !== m.id)))}
                     />
+                    </SectionBoundary>
                   </div>
                 );
               })}

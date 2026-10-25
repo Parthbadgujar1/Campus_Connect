@@ -382,6 +382,14 @@ export interface PollVote {
   createdAt: Date;
 }
 
+export interface CommentLike {
+  _id: string; // comment:user
+  commentId: string;
+  postId: string;
+  userId: string;
+  createdAt: Date;
+}
+
 export interface PostLike {
   _id: string; // post:user
   postId: string;
@@ -397,6 +405,8 @@ export interface Comment {
   parentId: string | null;
   body: string;
   status: ContentStatus;
+  /** How many people liked it (older comments have no count yet). */
+  likesCount?: number;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -993,6 +1003,7 @@ export interface Models {
   posts: Post;
   poll_votes: PollVote;
   post_likes: PostLike;
+  comment_likes: CommentLike;
   post_views: PostWatch;
   statuses: Status;
   status_views: StatusView;

@@ -9,6 +9,7 @@ import { useInfinite, useQuery, type Page } from '@/lib/api/hooks';
 import type { PostView } from '@/lib/api/types';
 import { buttonClass } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/states';
+import { SectionBoundary } from '@/components/common/section-boundary';
 import { LoopPlayer } from '@/components/loops/loop-player';
 import { useLive } from '@/lib/realtime';
 import { NewLoop } from '@/components/loops/new-loop';
@@ -236,8 +237,8 @@ function LoopsInner() {
           </div>
         )}
         {items.map((p, i) => (
+          <SectionBoundary key={p.id} label="This loop" className="h-dvh snap-start rounded-none border-0 bg-black text-white">
           <LoopPlayer
-            key={p.id}
             post={p}
             active={p.id === (activeId ?? items[0]?.id)}
             distance={Math.abs(i - activeIndex)}
@@ -249,6 +250,7 @@ function LoopsInner() {
             speed={speed}
             onSpeedChange={setSpeed}
           />
+          </SectionBoundary>
         ))}
         {feed.hasMore && <div ref={sentinel} className="grid h-24 place-items-center">{feed.loadingMore && <Spinner />}</div>}
         {!loading && !feed.hasMore && !(feed.error && !items.length) && <EndCard kind={endKind} onTop={() => scroller.current?.scrollTo({ top: 0, behavior: 'smooth' })} onNew={() => setCreating(true)} />}

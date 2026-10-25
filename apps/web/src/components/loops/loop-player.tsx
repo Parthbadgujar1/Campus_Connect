@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bookmark, EyeOff, Flag, Gauge, Heart, Link2, MessageCircle, MoreHorizontal, Pencil, Play, Send, Trash2, Volume2, VolumeX, ExternalLink } from 'lucide-react';
+import { Bookmark, EyeOff, Flag, Gauge, Heart, Link2, MessageCircle, MoreHorizontal, Music2, Pencil, Play, Send, Trash2, Volume2, VolumeX, ExternalLink } from 'lucide-react';
 import { del, errorMessage, patch, post as apiPost, put } from '@/lib/api/client';
 import { invalidate } from '@/lib/api/hooks';
 import type { PostView } from '@/lib/api/types';
@@ -19,6 +19,7 @@ import { AnimatePresence, motion } from '@/components/motion';
 import { ago } from '@/lib/live-time';
 import { cn } from '@/lib/utils';
 import { CommentsSheet } from './comments-sheet';
+import { LikedBySheet } from './liked-by-sheet';
 import { ShareSheet } from './share-sheet';
 import { ensureDuration } from './media';
 
@@ -63,7 +64,7 @@ export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChan
   const [bursts, setBursts] = useState<Array<{ id: number; x: number; y: number }>>([]);
   const [flash, setFlash] = useState<'muted' | 'sound' | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [sheet, setSheet] = useState<'comments' | 'share' | 'more' | 'report' | 'delete' | 'edit' | null>(null);
+  const [sheet, setSheet] = useState<'comments' | 'share' | 'more' | 'report' | 'delete' | 'edit' | 'likes' | null>(null);
   const [draft, setDraft] = useState('');
   const [savingCaption, setSavingCaption] = useState(false);
   const counted = useRef(false);
@@ -358,7 +359,11 @@ export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChan
                 <RichText text={caption} tagHref={(t) => `/loops?tag=${encodeURIComponent(t)}`} linkClassName="font-semibold" />
               </button>
             )}
-            <p className="mt-1.5 text-[12px] text-white/75">
+            <p className="mt-2 flex items-center gap-1.5 text-[13px] text-white/90">
+              <Music2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">Original audio · {post.author?.displayName ?? 'Anonymous'}</span>
+            </p>
+            <p className="mt-1 text-[12px] text-white/75">
               {compact(post.viewsCount)} view{post.viewsCount === 1 ? '' : 's'} · {ago(post.createdAt)}
               {post.audience.type !== 'college' && ` · ${post.audience.type === 'space' ? (post.audience.space?.name ?? 'Space') : post.audience.type === 'department' ? (post.audience.department ?? 'Department') : 'Your class'}`}
             </p>
@@ -366,12 +371,14 @@ export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChan
 
           {/* Actions */}
           <div className="absolute bottom-0 right-0 z-10 flex flex-col items-center gap-4 p-2.5 pb-[max(1.75rem,calc(env(safe-area-inset-bottom)+1.25rem))] text-white">
-            <button type="button" onClick={() => void like()} aria-pressed={post.liked} aria-label={post.liked ? 'Unlike' : 'Like'} className="flex flex-col items-center gap-0.5 text-[12px] font-semibold">
-              <motion.span key={String(post.liked)} initial={{ scale: post.liked ? 0.6 : 1 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 15 }}>
-                <Heart className={cn('h-7 w-7 drop-shadow', post.liked && 'fill-rose-500 text-rose-500')} aria-hidden="true" />
-              </motion.span>
-              {compact(post.likesCount)}
-            </button>
+            <div className="flex flex-col items-center gap-0.5 text-[12px] font-semibold">
+              <button type="button" onClick={() => void like()} aria-pressed={post.liked} aria-label={post.liked ? 'Unlike' : 'Like'}>
+                <motion.span key={String(post.liked)} initial={{ scale: post.liked ? 0.6 : 1 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 500, damping: 15 }} className="block">
+                  <Heart className={cn('h-7 w-7 drop-shadow', post.liked && 'fill-rose-500 text-rose-500')} aria-hidden="true" />
+                </motion.span>
+              </button>
+              <button type="button" onClick={() => post.likesCount > 0 && setSheet('likes')} aria-label={`${post.likesCount} likes. See who liked`} className="min-w-6 hover:underline">{compact(post.likesCount)}</button>
+            </div>
             <button type="button" onClick={() => setSheet('comments')} aria-label="Comments" className="flex flex-col items-center gap-0.5 text-[12px] font-semibold">
               <MessageCircle className="h-7 w-7 drop-shadow" aria-hidden="true" />
               {compact(post.commentsCount)}
@@ -386,6 +393,11 @@ export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChan
             <button type="button" onClick={() => setSheet('more')} aria-label="More options">
               <MoreHorizontal className="h-7 w-7 drop-shadow" aria-hidden="true" />
             </button>
+            {post.author && (
+              <span aria-hidden="true" className={cn('grid h-8 w-8 place-items-center rounded-lg border-2 border-white/80 bg-black/50', !paused && active && 'animate-spin-slow')}>
+                <Music2 className="h-4 w-4" />
+              </span>
+            )}
           </div>
 
           {/* Progress; drag to jump */}
@@ -410,6 +422,7 @@ export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChan
       </div>
 
       {sheet === 'comments' && <CommentsSheet postId={post.id} count={post.commentsCount} onClose={() => setSheet(null)} onCountChange={(n) => onChange({ ...post, commentsCount: n })} />}
+      {sheet === 'likes' && <LikedBySheet postId={post.id} total={post.likesCount} onClose={() => setSheet(null)} />}
       {sheet === 'share' && <ShareSheet path={link} title={caption ? caption.slice(0, 80) : 'A loop on CampusConnect'} onClose={() => setSheet(null)} />}
       <Sheet open={sheet === 'more'} onClose={() => setSheet(null)} title="Loop options">
         <div className="-mx-2 flex flex-col">

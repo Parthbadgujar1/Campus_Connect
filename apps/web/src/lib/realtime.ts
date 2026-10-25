@@ -54,8 +54,7 @@ class LiveConnection {
         } catch {
           return;
         }
-        if (event.type === 'ready') for (const fn of this.listeners) fn(event);
-        else this.listeners.forEach((fn) => fn(event));
+        this.emit(event);
       };
       ws.onclose = () => {
         this.socket = null;
@@ -66,6 +65,17 @@ class LiveConnection {
       this.retry();
     } finally {
       this.connecting = false;
+    }
+  }
+
+  /** Tells every screen about an event; a screen whose handler fails does not stop the others from hearing it. */
+  private emit(event: LiveEvent) {
+    for (const fn of [...this.listeners]) {
+      try {
+        fn(event);
+      } catch (err) {
+        console.error('A live-update handler failed', err);
+      }
     }
   }
 

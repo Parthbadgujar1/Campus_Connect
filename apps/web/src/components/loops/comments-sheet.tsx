@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CornerDownRight, Flag, Ghost, MessageCircle, Send, Trash2, X } from 'lucide-react';
-import { del, errorMessage, get, post } from '@/lib/api/client';
+import { CornerDownRight, Flag, Ghost, Heart, MessageCircle, Send, Trash2, X } from 'lucide-react';
+import { del, errorMessage, get, post, put } from '@/lib/api/client';
 import { useInfinite, type Page } from '@/lib/api/hooks';
 import type { CommentView } from '@/lib/api/types';
 import { Sheet } from '@/components/ui/sheet';
@@ -56,6 +56,20 @@ export function CommentsSheet({ postId, count, onClose, onCountChange }: { postI
       toast(errorMessage(err));
     } finally {
       setSending(false);
+    }
+  };
+
+  // A heart beside each comment: it fills at once and is undone if the server says no.
+  const toggleLike = async (c: CommentView) => {
+    const next = !c.liked;
+    const apply = (liked: boolean, likesCount: number) => list.setItems((items) => items.map((x) => (x.id === c.id ? { ...x, liked, likesCount } : x)));
+    apply(next, Math.max(0, (c.likesCount ?? 0) + (next ? 1 : -1)));
+    try {
+      const r = await (next ? put<{ likesCount: number }>(`/comments/${c.id}/like`) : del<{ likesCount: number }>(`/comments/${c.id}/like`));
+      apply(next, r.likesCount);
+    } catch (err) {
+      apply(Boolean(c.liked), c.likesCount ?? 0);
+      toast(errorMessage(err));
     }
   };
 
@@ -139,6 +153,12 @@ export function CommentsSheet({ postId, count, onClose, onCountChange }: { postI
                   </div>
                 )}
               </div>
+              {!c.deleted && (
+                <button type="button" onClick={() => void toggleLike(c)} aria-pressed={Boolean(c.liked)} aria-label={c.liked ? 'Unlike comment' : 'Like comment'} className="flex w-9 shrink-0 flex-col items-center gap-0.5 self-start pt-1 text-[11px] font-semibold text-text-3 hover:text-text">
+                  <Heart className={cn('h-[18px] w-[18px]', c.liked && 'fill-rose-500 text-rose-500')} aria-hidden="true" />
+                  {(c.likesCount ?? 0) > 0 ? c.likesCount : ''}
+                </button>
+              )}
             </li>
           ))}
         </ul>

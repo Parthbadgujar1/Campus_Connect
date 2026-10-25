@@ -256,7 +256,8 @@ export const SCHEMA: CollectionSpec[] = [
     ],
   },
   { name: 'poll_votes', indexes: [{ key: { postId: 1, userId: 1 } }] },
-  { name: 'post_likes', indexes: [{ key: { userId: 1, createdAt: -1 } }, { key: { postId: 1 } }] },
+  { name: 'post_likes', indexes: [{ key: { userId: 1, createdAt: -1 } }, { key: { postId: 1, createdAt: -1 } }] },
+  { name: 'comment_likes', indexes: [{ key: { userId: 1, createdAt: -1 } }, { key: { commentId: 1, createdAt: -1 } }] },
   // One row per person who watched a video post, so each viewer is counted once.
   { name: 'post_views', indexes: [{ key: { userId: 1 } }, { key: { postId: 1 } }] },
   // Status updates and who saw them disappear 24 hours after posting (TTL on expiresAt).
