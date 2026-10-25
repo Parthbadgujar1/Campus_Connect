@@ -16,7 +16,7 @@ import { Card, EmptyState, PageHeader } from '@/components/ui/layout';
 import { InfiniteList } from '@/components/ui/infinite';
 import { PersonAvatar, PersonName } from '@/components/ui/person-avatar';
 import { Sheet } from '@/components/ui/sheet';
-import { ErrorState, FormAlert, SkeletonList, Spinner } from '@/components/ui/states';
+import { ConfirmDialog, ErrorState, FormAlert, SkeletonList, Spinner } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
 import { PostStream } from '@/components/feed/post-stream';
 import { Reveal } from '@/components/motion';
@@ -137,6 +137,7 @@ function SpaceInner({ slug }: { slug: string }) {
   const params = useSearchParams();
   const tab = (params.get('tab') as Tab) || 'board';
   const [writing, setWriting] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const q = useQuery<SpaceDetail>(`spaces:one:${slug}`, (signal) => get(`/spaces/${slug}`, undefined, signal));
   const join = useAction(async () => {
     const r = await post<{ status: string }>(`/spaces/${q.data!.id}/join`);
@@ -147,8 +148,10 @@ function SpaceInner({ slug }: { slug: string }) {
   const leave = useAction(async () => {
     await del(`/spaces/${q.data!.id}/membership`);
     toast('You left the space');
+    setLeaving(false);
     q.reload();
     invalidate('spaces:list');
+    invalidate('chats:list');
   });
   const s = q.data;
   const member = s?.membership?.status === 'active';
@@ -187,7 +190,7 @@ function SpaceInner({ slug }: { slug: string }) {
                   <>
                     <Button onClick={() => setWriting(true)}><Plus className="h-4 w-4" aria-hidden="true" /> New discussion</Button>
                     <Button variant="secondary" onClick={() => void openChat.run()} disabled={openChat.pending}>{openChat.pending ? <Spinner /> : <MessagesSquare className="h-4 w-4" aria-hidden="true" />} Group chat</Button>
-                    {s.membership?.role !== 'owner' && <Button variant="ghost" onClick={() => void leave.run()} disabled={leave.pending}><LogOut className="h-4 w-4" aria-hidden="true" /> Leave</Button>}
+                    {s.membership?.role !== 'owner' && <Button variant="ghost" onClick={() => setLeaving(true)} disabled={leave.pending}><LogOut className="h-4 w-4" aria-hidden="true" /> Leave</Button>}
                   </>
                 ) : s.membership?.status === 'pending' ? (
                   <Badge tone="warning">Your request is waiting</Badge>
@@ -228,6 +231,17 @@ function SpaceInner({ slug }: { slug: string }) {
             </>
           )}
           <NewDiscussion space={s} open={writing} onClose={() => setWriting(false)} />
+          <ConfirmDialog
+            open={leaving}
+            onClose={() => setLeaving(false)}
+            onConfirm={() => void leave.run()}
+            title={`Leave ${s.name}?`}
+            description="You will stop seeing its board and group chat. You can join again later (private spaces need an owner's approval)."
+            confirmLabel="Leave"
+            danger
+            pending={leave.pending}
+            error={leave.error?.message}
+          />
         </Reveal>
       )}
     </div>

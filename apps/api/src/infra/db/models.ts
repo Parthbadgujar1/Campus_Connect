@@ -547,6 +547,10 @@ export interface ChatMember {
   pinnedAt: Date | null;
   colorWash: 'none' | 'meadow' | 'ocean' | 'blossom' | 'ember';
   anonymousAlias: number | null;
+  /** "Clear chat" / "Delete chat": messages up to this moment are hidden for this person only. */
+  clearedAt?: Date | null;
+  /** "Delete chat": the chat stays out of the list until a newer message arrives. */
+  hiddenAt?: Date | null;
 }
 
 export interface Message {
@@ -562,6 +566,8 @@ export interface Message {
   clientId: string | null;
   /** Sent on from another chat (shown as "Forwarded"). */
   forwarded?: boolean;
+  /** People who chose "Delete for me": the message is hidden from them only. */
+  hiddenFor?: string[];
   editedAt: Date | null;
   deletedAt: Date | null;
   createdAt: Date;

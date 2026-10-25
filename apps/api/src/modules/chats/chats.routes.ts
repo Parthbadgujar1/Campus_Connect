@@ -101,6 +101,11 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
       const people = await loadPeople(app.deps, [...others.values()]);
       const needle = q?.toLowerCase();
       let list = chatRows
+        // A chat the person deleted stays out of the list until a newer message arrives.
+        .filter((c) => {
+          const hidden = memberBy.get(c._id)?.hiddenAt;
+          return !hidden || (c.lastMessageAt ?? new Date(0)) > hidden;
+        })
         .filter((c) => c.kind !== 'direct' || !blockedSet.has(others.get(c._id) ?? ''))
         .filter((c) => !needle || (c.kind === 'direct' ? personOf(people, others.get(c._id)).displayName : (c.title ?? '')).toLowerCase().includes(needle))
         .sort((a, b) => {
@@ -120,9 +125,18 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
       const pageRows = list.slice(0, limit);
       const ids = pageRows.map((c) => c._id);
       const [lastMessages, counts, unread] = await Promise.all([
-        messages()
-          .aggregate<{ _id: string; last: Message }>([{ $match: { chatId: { $in: ids } } }, { $sort: { chatId: 1, createdAt: -1, _id: -1 } }, { $group: { _id: '$chatId', last: { $first: '$$ROOT' } } }])
-          .toArray(),
+        // One indexed lookup per chat (newest first) instead of sorting every message of every chat.
+        Promise.all(
+          ids.map(async (cid) => {
+            const me = memberBy.get(cid)!;
+            const last = await messages()
+              .find({ chatId: cid, hiddenFor: { $ne: auth.userId }, ...(me.clearedAt ? { createdAt: { $gt: me.clearedAt } } : {}) })
+              .sort({ createdAt: -1, _id: -1 })
+              .limit(1)
+              .next();
+            return last ? { _id: cid, last } : null;
+          }),
+        ).then((rows) => rows.filter((r): r is { _id: string; last: Message } => r !== null)),
         members().aggregate<{ _id: string; n: number }>([{ $match: { chatId: { $in: ids } } }, { $group: { _id: '$chatId', n: { $sum: 1 } } }]).toArray(),
         Promise.all(
           pageRows.map(async (c) => {
@@ -327,8 +341,12 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
   });
 
   // ---------------------------------------------------------------- messages
-  function visibleSince(m: ChatMembership): Filter<Message> {
-    return m.disappearingSeconds ? { createdAt: { $gt: new Date(Date.now() - m.disappearingSeconds * 1000) } } : {};
+  /** Messages this person can see: not expired, not cleared by them, and not deleted for them. */
+  function visibleSince(m: ChatMembership, userId: string): Filter<Message> {
+    const and: Filter<Message>[] = [{ hiddenFor: { $ne: userId } }];
+    if (m.disappearingSeconds) and.push({ createdAt: { $gt: new Date(Date.now() - m.disappearingSeconds * 1000) } });
+    if (m.member.clearedAt) and.push({ createdAt: { $gt: m.member.clearedAt } });
+    return { $and: and };
   }
 
   app.get(
@@ -354,7 +372,7 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
       if (q) {
         const pattern = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const found = await messages()
-          .find({ $and: [{ chatId: m.chatId, deletedAt: null, body: { $regex: pattern, $options: 'i' } }, visibleSince(m)] })
+          .find({ $and: [{ chatId: m.chatId, deletedAt: null, body: { $regex: pattern, $options: 'i' } }, visibleSince(m, auth.userId)] })
           .sort({ createdAt: -1, _id: -1 })
           .limit(limit)
           .toArray();
@@ -362,7 +380,7 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
       }
       const b = decodeCursor(before);
       const a = decodeCursor(after);
-      const and: Filter<Message>[] = [{ chatId: m.chatId }, visibleSince(m)];
+      const and: Filter<Message>[] = [{ chatId: m.chatId }, visibleSince(m, auth.userId)];
       if (b) and.push({ $or: [{ createdAt: { $lt: new Date(b.at) } }, { createdAt: new Date(b.at), _id: { $lt: b.id } }] });
       if (a) and.push({ $or: [{ createdAt: { $gt: new Date(a.at) } }, { createdAt: new Date(a.at), _id: { $gt: a.id } }] });
       const rows = await messages()
@@ -393,27 +411,25 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
       const m = await requireMember(db, auth.userId, request.params.id);
       const b = request.body;
 
+      const otherId = otherInDirect(m, auth.userId);
+      // All the checks at once (each is one round trip to the database).
+      const [dup, blocked, snapsOn, file, replied] = await Promise.all([
+        messages().findOne({ chatId: m.chatId, senderId: auth.userId, clientId: b.clientId }),
+        otherId ? isBlockedBetween(db, auth.userId, otherId) : Promise.resolve(false),
+        b.kind === 'snap' ? app.deps.flags.isEnabled('feature.chat_snaps', { userId: auth.userId, role: auth.role, collegeId: auth.collegeId }) : Promise.resolve(true),
+        b.fileId ? db.col('files').findOne({ _id: b.fileId, ownerId: auth.userId, purpose: 'message', status: { $in: ['ready', 'pending'] }, deletedAt: null }, { projection: { kind: 1 } }) : Promise.resolve(null),
+        b.replyToId ? messages().findOne({ _id: b.replyToId, chatId: m.chatId }, { projection: { _id: 1 } }) : Promise.resolve(null),
+      ]);
       // A retry of a message that already went through: return it unchanged.
-      const dup = await messages().findOne({ chatId: m.chatId, senderId: auth.userId, clientId: b.clientId });
       if (dup) {
         const [view] = await toMessageViews(app.deps, auth.userId, m.chat, [dup]);
         return reply.status(200).send(view);
       }
-
       if (m.onlyAdminsPost && m.role === 'member') throw Errors.forbidden('Only admins can post in this chat.');
-      const otherId = otherInDirect(m, auth.userId);
-      if (otherId && (await isBlockedBetween(db, auth.userId, otherId))) throw Errors.forbidden('You cannot message this person.');
-      if (b.kind === 'snap' && !(await app.deps.flags.isEnabled('feature.chat_snaps', { userId: auth.userId, role: auth.role, collegeId: auth.collegeId }))) {
-        throw Errors.featureDisabled('feature.chat_snaps');
-      }
-      if (b.fileId) {
-        const f = await db.col('files').findOne({ _id: b.fileId, ownerId: auth.userId, purpose: 'message', status: { $in: ['ready', 'pending'] }, deletedAt: null }, { projection: { kind: 1 } });
-        if (!f || !(FILE_KINDS[b.kind] ?? []).includes(f.kind)) throw Errors.validation([{ field: 'fileId', message: 'Upload the attachment again.' }]);
-      }
-      if (b.replyToId) {
-        const r = await messages().findOne({ _id: b.replyToId, chatId: m.chatId }, { projection: { _id: 1 } });
-        if (!r) throw Errors.validation([{ field: 'replyToId', message: 'That message is no longer here.' }]);
-      }
+      if (blocked) throw Errors.forbidden('You cannot message this person.');
+      if (!snapsOn) throw Errors.featureDisabled('feature.chat_snaps');
+      if (b.fileId && (!file || !(FILE_KINDS[b.kind] ?? []).includes(file.kind))) throw Errors.validation([{ field: 'fileId', message: 'Upload the attachment again.' }]);
+      if (b.replyToId && !replied) throw Errors.validation([{ field: 'replyToId', message: 'That message is no longer here.' }]);
       let payload: Record<string, unknown>;
       try {
         payload = cleanPayload(b.kind, b.payload);
@@ -433,17 +449,20 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
         const [view] = await toMessageViews(app.deps, auth.userId, m.chat, [first]);
         return reply.status(200).send(view);
       }
-      await Promise.all([
+      // Save the chat's new activity while the message view is built, show it to everyone, and only
+      // then do the slower extras (notification) without making the sender wait for them.
+      const [, , [view]] = await Promise.all([
         chats().updateOne({ _id: m.chatId }, { $max: { lastMessageAt: now } }),
         members().updateOne({ _id: m.member._id }, { $max: { lastReadAt: now } }),
+        toMessageViews(app.deps, auth.userId, m.chat, [msg], { fresh: true }),
       ]);
-      const [view] = await toMessageViews(app.deps, auth.userId, m.chat, [msg]);
       realtime.toChat(m.chatId, { type: 'message.created', chatId: m.chatId, message: { ...view, isMine: false } }, auth.userId);
 
       // Notify the other person in a direct chat (not every message of busy groups).
       if (otherId) {
-        const other = await members().findOne({ _id: memberKey(m.chatId, otherId) }, { projection: { mutedUntil: 1 } });
-        if (!(other?.mutedUntil && other.mutedUntil > new Date())) {
+        void (async () => {
+          const other = await members().findOne({ _id: memberKey(m.chatId, otherId) }, { projection: { mutedUntil: 1 } });
+          if (other?.mutedUntil && other.mutedUntil > new Date()) return;
           await app.deps.notifier.send({
             userId: otherId,
             kind: 'message',
@@ -454,7 +473,7 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
             entityType: 'chat',
             entityId: m.chatId,
           });
-        }
+        })().catch((err) => app.log.warn({ err: (err as Error).message }, 'message notification failed'));
       }
       return reply.status(201).send(view);
     },
@@ -539,6 +558,55 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
     return { status: 'deleted' };
   });
 
+  // "Delete for me": hides messages from this person only (everyone else still sees them).
+  app.post(
+    '/chats/:id/messages/hide',
+    { schema: { tags: ['chats'], summary: 'Delete messages for me only', params: idParam, body: z.object({ messageIds: z.array(uuid).min(1).max(100) }) } },
+    async (request) => {
+      const auth = requireAuth(request);
+      const m = await requireMember(db, auth.userId, request.params.id);
+      const res = await messages().updateMany({ _id: { $in: request.body.messageIds }, chatId: m.chatId }, { $addToSet: { hiddenFor: auth.userId } });
+      return { status: 'hidden', count: res.modifiedCount };
+    },
+  );
+
+  // "Unsend": delete several of my messages for everyone (group admins can remove anyone's).
+  app.post(
+    '/chats/:id/messages/unsend',
+    { schema: { tags: ['chats'], summary: 'Delete messages for everyone (mine, or any as a group admin)', params: idParam, body: z.object({ messageIds: z.array(uuid).min(1).max(100) }) } },
+    async (request) => {
+      const auth = requireAuth(request);
+      const m = await requireMember(db, auth.userId, request.params.id);
+      const mine: Filter<Message> = m.role === 'member' ? { senderId: auth.userId } : {};
+      const rows = await messages().find({ _id: { $in: request.body.messageIds }, chatId: m.chatId, deletedAt: null, kind: { $ne: 'system' }, ...mine }, { projection: { _id: 1 } }).toArray();
+      if (!rows.length) return { status: 'deleted', count: 0, ids: [] as string[] };
+      const ids = rows.map((r) => r._id);
+      await messages().updateMany({ _id: { $in: ids } }, { $set: { deletedAt: new Date(), body: null, payload: {} } });
+      for (const messageId of ids) realtime.toChat(m.chatId, { type: 'message.deleted', chatId: m.chatId, messageId });
+      return { status: 'deleted', count: ids.length, ids };
+    },
+  );
+
+  // "Clear chat": empties the chat for me and keeps it in my list.
+  app.post('/chats/:id/clear', { schema: { tags: ['chats'], summary: 'Clear this chat for me', params: idParam } }, async (request) => {
+    const auth = requireAuth(request);
+    const m = await requireMember(db, auth.userId, request.params.id);
+    const now = new Date();
+    await members().updateOne({ _id: m.member._id }, { $set: { clearedAt: now }, $max: { lastReadAt: now } });
+    return { status: 'cleared' };
+  });
+
+  // "Delete chat": clears it and removes it from my list until someone sends something new. Groups and
+  // communities are left instead (Exit group), because deleting them for one person means leaving.
+  app.delete('/chats/:id', { schema: { tags: ['chats'], summary: 'Delete a direct chat for me', params: idParam } }, async (request) => {
+    const auth = requireAuth(request);
+    const m = await requireMember(db, auth.userId, request.params.id);
+    if (m.kind !== 'direct') throw Errors.conflict('Leave the group to remove it from your chats.');
+    const now = new Date();
+    await members().updateOne({ _id: m.member._id }, { $set: { clearedAt: now, hiddenAt: now, pinnedAt: null }, $max: { lastReadAt: now } });
+    return { status: 'deleted' };
+  });
+
   async function broadcastReactions(chatId: string, messageId: string) {
     const rows = await db
       .col('message_reactions')
@@ -619,7 +687,7 @@ export const chatRoutes: FastifyPluginAsync = async (base) => {
     const auth = requireAuth(request);
     const m = await requireMember(db, auth.userId, request.params.id);
     const rows = await messages()
-      .find({ $and: [{ chatId: m.chatId, fileId: { $type: 'string' }, kind: { $ne: 'snap' }, deletedAt: null }, visibleSince(m)] })
+      .find({ $and: [{ chatId: m.chatId, fileId: { $type: 'string' }, kind: { $ne: 'snap' }, deletedAt: null }, visibleSince(m, auth.userId)] })
       .sort({ createdAt: -1 })
       .limit(100)
       .toArray();

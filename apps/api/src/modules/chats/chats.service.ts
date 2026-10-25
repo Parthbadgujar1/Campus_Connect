@@ -139,14 +139,17 @@ export interface MessageView {
 const ANONYMOUS_ID = '00000000-0000-0000-0000-000000000000';
 
 /** Shapes messages, loading senders, files, reactions, responses, replies and snap state in bulk. */
-export async function toMessageViews(deps: Deps, viewerId: string, chat: Pick<Chat, '_id' | 'kind'>, rows: Message[]): Promise<MessageView[]> {
+/** `fresh` marks messages that were created a moment ago: they have no reactions, answers or views yet, so those lookups are skipped. */
+export async function toMessageViews(deps: Deps, viewerId: string, chat: Pick<Chat, '_id' | 'kind'>, rows: Message[], opts: { fresh?: boolean } = {}): Promise<MessageView[]> {
   if (!rows.length) return [];
   const db = deps.db;
   const ids = rows.map((r) => r._id);
   const replyIds = rows.map((r) => r.replyToId).filter((x): x is string => Boolean(x));
   const anonymousChat = chat.kind === 'anonymous';
   const [reactions, responses, views, replies, aliases] = await Promise.all([
-    db
+    opts.fresh
+      ? Promise.resolve([] as Array<{ _id: { m: string; e: string }; n: number; mine: number; first: Date }>)
+      : db
       .col('message_reactions')
       .aggregate<{ _id: { m: string; e: string }; n: number; mine: number; first: Date }>([
         { $match: { messageId: { $in: ids } } },
@@ -154,14 +157,16 @@ export async function toMessageViews(deps: Deps, viewerId: string, chat: Pick<Ch
         { $sort: { first: 1 } },
       ])
       .toArray(),
-    db
+    opts.fresh
+      ? Promise.resolve([] as Array<{ _id: { m: string; r: string }; n: number; mine: number }>)
+      : db
       .col('message_responses')
       .aggregate<{ _id: { m: string; r: string }; n: number; mine: number }>([
         { $match: { messageId: { $in: ids } } },
         { $group: { _id: { m: '$messageId', r: '$response' }, n: { $sum: 1 }, mine: { $max: { $cond: [{ $eq: ['$userId', viewerId] }, 1, 0] } } } },
       ])
       .toArray(),
-    db.col('message_views').find({ _id: { $in: ids.map((i) => `${i}:${viewerId}`) } }, { projection: { messageId: 1 } }).toArray(),
+    opts.fresh ? Promise.resolve([] as Array<{ messageId: string }>) : db.col('message_views').find({ _id: { $in: ids.map((i) => `${i}:${viewerId}`) } }, { projection: { messageId: 1 } }).toArray(),
     replyIds.length ? db.col('messages').find({ _id: { $in: replyIds } }, { projection: { body: 1, deletedAt: 1, senderId: 1 } }).toArray() : Promise.resolve([]),
     anonymousChat
       ? db.col('chat_members').find({ chatId: chat._id, userId: { $in: rows.map((r) => r.senderId).filter((x): x is string => Boolean(x)) } }, { projection: { userId: 1, anonymousAlias: 1 } }).toArray()

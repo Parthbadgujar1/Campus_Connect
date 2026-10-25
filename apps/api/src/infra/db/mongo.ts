@@ -9,7 +9,7 @@ import type { CollectionName, Models } from './models.js';
 //     timeouts (a slow or unreachable database fails fast instead of piling up requests)
 //   * the API starts even while the database is down; /health/ready reports it and every request
 //     that needs data answers a clear 503 until it is back (the driver reconnects by itself)
-//   * reads may go to secondaries when a replica set has them; writes always go to the primary
+//   * reads and writes both go to the primary (required for reading inside transactions)
 //   * tx() runs a function in a multi-document transaction on a replica set (MongoDB Atlas, or a
 //     local single-node replica set). On a standalone server it runs the same function without a
 //     transaction: every write in this codebase is ordered so a partial run is safe to retry.
@@ -56,7 +56,9 @@ export class Mongo {
       socketTimeoutMS: options.operationTimeoutMs,
       retryWrites: true,
       retryReads: true,
-      readPreference: 'primaryPreferred',
+      // Always the primary: the driver rejects any other read preference inside a transaction, which
+      // made every transaction that reads (leave a group, accept a request...) fail on a replica set.
+      readPreference: 'primary',
       writeConcern: { w: 'majority', wtimeoutMS: 5_000 },
       ignoreUndefined: true,
     });

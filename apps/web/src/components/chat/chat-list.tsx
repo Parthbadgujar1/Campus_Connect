@@ -2,9 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { BellOff, Check, Hash, MessageSquarePlus, MessagesSquare, Pin, Search, Users, UsersRound, VenetianMask } from 'lucide-react';
-import { get, post } from '@/lib/api/client';
+import { useEffect, useRef, useState } from 'react';
+import { Archive, BellOff, Check, CheckSquare, Hash, MessageSquarePlus, MessagesSquare, Pin, Search, Trash2, Users, UsersRound, VenetianMask, X } from 'lucide-react';
+import { del, get, patch, post } from '@/lib/api/client';
 import { invalidate, useAction, useInfinite, type Page } from '@/lib/api/hooks';
 import type { ChatListItem, PersonSummary } from '@/lib/api/types';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,12 @@ import { EndOfList } from '@/components/ui/infinite';
 import { EmptyState } from '@/components/ui/layout';
 import { PersonAvatar } from '@/components/ui/person-avatar';
 import { Sheet } from '@/components/ui/sheet';
-import { ErrorState, FormAlert, LoadMore, SkeletonList, Spinner } from '@/components/ui/states';
+import { ConfirmDialog, ErrorState, FormAlert, LoadMore, SkeletonList, Spinner } from '@/components/ui/states';
 import { Avatar } from '@/components/ui/avatar';
 import { Stagger, StaggerItem } from '@/components/motion';
 import { useLive } from '@/lib/realtime';
+import { useSession } from '@/lib/session';
+import { useToast } from '@/components/ui/toast';
 import { refreshBadges } from '@/components/shell/app-shell';
 import { ago } from '@/lib/live-time';
 import { cn } from '@/lib/utils';
@@ -107,12 +109,24 @@ export function ChatList() {
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
   const [composing, setComposing] = useState(false);
+  const toast = useToast();
+  const { user } = useSession();
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const list = useInfinite<ChatListItem>(`chats:list:${filter}:${search}`, (cursor, signal) => get<Page<ChatListItem>>('/chats', { filter, q: search || undefined, cursor: cursor ?? undefined, limit: 40 }, signal));
   // New messages anywhere: refresh the list (cheap) and the badges.
+  // Busy chats can send many events a second: refresh the list once for the whole burst.
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (refreshTimer.current) clearTimeout(refreshTimer.current); }, []);
   useLive(null, (e) => {
     if (e.type === 'message.created' || e.type === 'chat.updated' || e.type === 'ready') {
-      invalidate('chats:list');
-      refreshBadges();
+      if (refreshTimer.current) return;
+      refreshTimer.current = setTimeout(() => {
+        refreshTimer.current = null;
+        invalidate('chats:list');
+        refreshBadges();
+      }, 1200);
     }
   });
   // Lists also refresh on a timer, in case the live connection is down.
@@ -121,13 +135,62 @@ export function ChatList() {
     return () => clearInterval(t);
   }, []);
   const activeId = pathname.startsWith('/chats/') ? pathname.split('/')[2] : null;
+
+  // ---- selecting chats: long-press (or right-click) a chat, or tap Select
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressEnd = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+  };
+  const startSelecting = (id: string) => {
+    setSelecting(true);
+    setPicked((p) => (p.includes(id) ? p : [...p, id]));
+  };
+  const stopSelecting = () => {
+    setSelecting(false);
+    setPicked([]);
+  };
+  const chosen = list.items.filter((c) => picked.includes(c.id));
+  const bulk = useAction(async (change: Record<string, unknown>, message: string) => {
+    await Promise.all(chosen.map((c) => patch(`/chats/${c.id}/settings`, change)));
+    invalidate('chats:list');
+    refreshBadges();
+    toast(message);
+    stopSelecting();
+  });
+  const removeChosen = useAction(async () => {
+    // Direct chats are deleted for me; groups and communities are left.
+    await Promise.all(chosen.map((c) => (c.kind === 'direct' ? del(`/chats/${c.id}`) : user ? del(`/chats/${c.id}/members/${user.id}`) : Promise.resolve())));
+    invalidate('chats:list');
+    refreshBadges();
+    toast(chosen.length === 1 ? 'Done' : `${chosen.length} chats removed`);
+    setConfirmDelete(false);
+    stopSelecting();
+  });
+  const allPinned = chosen.length > 0 && chosen.every((c) => c.pinned);
+  const allMuted = chosen.length > 0 && chosen.every((c) => c.muted);
+  const leavesGroups = chosen.some((c) => c.kind !== 'direct');
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="pt-safe shrink-0 px-4 pb-3 pt-4">
-        <div className="flex items-center justify-between gap-3">
-          <h1 className="marker-heading hl-green text-[28px] font-bold leading-tight">Chats</h1>
-          <Button size="sm" onClick={() => setComposing(true)}><MessageSquarePlus className="h-4 w-4" aria-hidden="true" /> New</Button>
-        </div>
+        {selecting ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={stopSelecting} aria-label="Cancel selecting" className="grid h-10 w-10 place-items-center rounded-full hover:bg-surface-2"><X className="h-5 w-5" aria-hidden="true" /></button>
+            <span className="min-w-0 flex-1 text-[18px] font-bold">{picked.length ? `${picked.length} selected` : 'Select chats'}</span>
+            <Button size="sm" variant="secondary" disabled={!picked.length || bulk.pending} onClick={() => void bulk.run({ pinned: !allPinned }, allPinned ? 'Unpinned' : 'Pinned')}><Pin className="h-4 w-4" aria-hidden="true" /> {allPinned ? 'Unpin' : 'Pin'}</Button>
+            <Button size="sm" variant="secondary" disabled={!picked.length || bulk.pending} onClick={() => void bulk.run({ muteHours: allMuted ? 0 : 8 }, allMuted ? 'Unmuted' : 'Muted for 8 hours')}><BellOff className="h-4 w-4" aria-hidden="true" /> {allMuted ? 'Unmute' : 'Mute'}</Button>
+            <Button size="sm" variant="secondary" disabled={!picked.length || bulk.pending} onClick={() => void bulk.run({ archived: filter !== 'archived' }, filter === 'archived' ? 'Moved to inbox' : 'Archived')}><Archive className="h-4 w-4" aria-hidden="true" /> {filter === 'archived' ? 'Unarchive' : 'Archive'}</Button>
+            <Button size="sm" variant="danger" disabled={!picked.length} onClick={() => setConfirmDelete(true)}><Trash2 className="h-4 w-4" aria-hidden="true" /> {chosen.length > 0 && chosen.every((c) => c.kind !== 'direct') ? 'Leave' : 'Delete'}</Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="marker-heading hl-green text-[28px] font-bold leading-tight">Chats</h1>
+            <div className="flex items-center gap-2">
+              {list.items.length > 0 && <Button size="sm" variant="secondary" onClick={() => setSelecting(true)}><CheckSquare className="h-4 w-4" aria-hidden="true" /> Select</Button>}
+              <Button size="sm" onClick={() => setComposing(true)}><MessageSquarePlus className="h-4 w-4" aria-hidden="true" /> New</Button>
+            </div>
+          </div>
+        )}
         <StatusStrip />
         <form className="relative mt-3" onSubmit={(e) => { e.preventDefault(); setSearch(q.trim()); }}>
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-text-3" aria-hidden="true" />
@@ -149,7 +212,34 @@ export function ChatList() {
           <Stagger as="ul">
             {list.items.map((c) => (
               <StaggerItem key={c.id} as="li">
-                <Link href={`/chats/${c.id}`} className={cn('flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2', activeId === c.id && 'bg-surface-2')} aria-current={activeId === c.id ? 'page' : undefined}>
+                <Link
+                  href={`/chats/${c.id}`}
+                  onClick={(e) => {
+                    if (!selecting) return;
+                    e.preventDefault();
+                    setPicked((p) => (p.includes(c.id) ? p.filter((x) => x !== c.id) : [...p, c.id]));
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    startSelecting(c.id);
+                  }}
+                  onPointerDown={(e) => {
+                    if (selecting || e.pointerType === 'mouse') return;
+                    pressEnd();
+                    pressTimer.current = setTimeout(() => startSelecting(c.id), 500);
+                  }}
+                  onPointerUp={pressEnd}
+                  onPointerLeave={pressEnd}
+                  onPointerCancel={pressEnd}
+                  draggable={false}
+                  className={cn('flex items-center gap-3 px-4 py-3 transition-colors hover:bg-surface-2 [-webkit-touch-callout:none]', activeId === c.id && !selecting && 'bg-surface-2', picked.includes(c.id) && 'bg-accent-soft/60')}
+                  aria-current={activeId === c.id ? 'page' : undefined}
+                >
+                  {selecting && (
+                    <span className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-full border-2', picked.includes(c.id) ? 'border-accent bg-accent text-accent-ink' : 'border-text-3')} aria-hidden="true">
+                      {picked.includes(c.id) && <Check className="h-4 w-4" />}
+                    </span>
+                  )}
                   <ChatAvatar chat={c} />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
@@ -173,6 +263,17 @@ export function ChatList() {
         {list.items.length > 0 && (list.hasMore ? <LoadMore hasMore={list.hasMore} loading={list.loadingMore} onClick={list.loadMore} /> : <EndOfList message="No more chats" className="py-6" />)}
       </div>
       <NewChat open={composing} onClose={() => setComposing(false)} />
+      <ConfirmDialog
+        open={confirmDelete}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => void removeChosen.run()}
+        title={chosen.length === 1 ? (chosen[0]?.kind === 'direct' ? 'Delete this chat?' : 'Leave this group?') : `Remove ${chosen.length} chats?`}
+        description={chosen.every((c) => c.kind !== 'direct') ? 'You will stop getting messages from these groups. An admin can add you back.' : leavesGroups ? 'Direct chats are deleted for you only and come back if they message you again. You will leave any groups, and an admin can add you back.' : 'The chat and its messages are removed for you only. It comes back if they message you again.'}
+        confirmLabel={chosen.length > 0 && chosen.every((c) => c.kind !== 'direct') ? 'Leave' : 'Delete'}
+        danger
+        pending={removeChosen.pending}
+        error={removeChosen.error?.message}
+      />
     </div>
   );
 }

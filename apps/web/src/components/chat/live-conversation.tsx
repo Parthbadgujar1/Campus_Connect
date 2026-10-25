@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowLeft, Archive, BellOff, Bell, CalendarClock, Check, CheckCheck, Copy, CornerUpLeft, Eye, FileText, Flag, Forward, Info, LogOut, MapPin, Mic, MoreVertical, Pencil, Pin, Play, Plus, Search, Send, SmilePlus, Trash2, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowLeft, Archive, BellOff, Bell, CalendarClock, Check, CheckCheck, CheckSquare, Clock, CornerUpLeft, Eraser, Eye, FileText, Forward, Info, LogOut, MapPin, Mic, MoreHorizontal, MoreVertical, Pin, Play, Plus, Search, Send, SmilePlus, Trash2, Users, X } from 'lucide-react';
 import { clientId, del, errorMessage, get, patch, post, put, uploadWithProgress } from '@/lib/api/client';
 import { invalidate, useAction, useQuery } from '@/lib/api/hooks';
 import type { ChatListItem, FileView, MessageView } from '@/lib/api/types';
@@ -13,7 +13,7 @@ import { Field, Input } from '@/components/ui/fields';
 import { Menu } from '@/components/ui/menu';
 import { PersonAvatar } from '@/components/ui/person-avatar';
 import { Sheet } from '@/components/ui/sheet';
-import { ErrorState, FormAlert, Spinner } from '@/components/ui/states';
+import { ConfirmDialog, ErrorState, FormAlert, Spinner } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
 import { ReportSheet } from '@/components/common/report-sheet';
 import { AnimatePresence, motion } from '@/components/motion';
@@ -28,10 +28,14 @@ import { usePublicConfig } from '@/components/shell/public-shell';
 import { AttachSheet, ContactSheet, MediaComposer, PollSheet, shareLocation, type OutgoingMessage } from './attach';
 import { ChatInfoSheet, ChatSearchSheet, ForwardSheet, WALLPAPERS, presenceLabel } from './chat-sheets';
 import { MediaViewer, type ViewerItem } from './media-viewer';
+import { MessageActionSheet } from './message-actions';
 import { VoicePlayer, VoiceRecorder } from './voice';
 
 const QUICK = ['👍', '❤️', '😂', '🎉', '😮', '🙏'];
 const EDIT_WINDOW_MS = 15 * 60_000;
+
+/** A message in the list; `pending` marks one that is still being sent (or could not be). */
+type ChatMessage = MessageView & { pending?: 'sending' | 'failed' };
 
 interface MessagesPage {
   items: MessageView[];
@@ -44,12 +48,33 @@ function dayKey(iso: string) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
-function Bubble({ m, chat, onReply, onChange, onReport, onOpenMedia, onForward, readByOther, highlight }: { m: MessageView; chat: ChatDetail; onReply: (m: MessageView) => void; onChange: (m: MessageView | null) => void; onReport: (m: MessageView) => void; onOpenMedia: (m: MessageView) => void; onForward: (m: MessageView) => void; readByOther: boolean; highlight: boolean }) {
-  const toast = useToast();
+function Bubble({ m, chat, onReply, onChange, onOpenMedia, onActions, onRetry, onDiscard, onSelect, selecting, selected, editRequested, onEditStarted, readByOther, highlight }: { m: ChatMessage; chat: ChatDetail; onReply: (m: MessageView) => void; onChange: (m: MessageView | null) => void; onOpenMedia: (m: MessageView) => void; onActions: (m: ChatMessage) => void; onRetry: (m: ChatMessage) => void; onDiscard: (m: ChatMessage) => void; onSelect: (m: ChatMessage) => void; selecting: boolean; selected: boolean; editRequested: boolean; onEditStarted: () => void; readByOther: boolean; highlight: boolean }) {
+  // Press and hold on a phone (or right-click) opens the message menu.
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pressEnd = () => {
+    if (pressTimer.current) clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+  };
+  const pressStart = (e: React.PointerEvent) => {
+    if (selecting || m.deleted || m.pending || e.pointerType === 'mouse') return;
+    pressEnd();
+    pressTimer.current = setTimeout(() => onActions(m), 450);
+  };
+  const contextMenu = (e: React.MouseEvent) => {
+    if (m.deleted || m.pending) return;
+    e.preventDefault();
+    onActions(m);
+  };
   const [snapUrl, setSnapUrl] = useState<FileView | null>(null);
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(m.body ?? '');
   const [picking, setPicking] = useState(false);
+  useEffect(() => {
+    if (!editRequested) return;
+    setText(m.body ?? '');
+    setEditing(true);
+    onEditStarted();
+  }, [editRequested, m.body, onEditStarted]);
   const react = useAction(async (emoji: string) => {
     const mine = m.reactions.find((r) => r.emoji === emoji)?.mine;
     const res = mine ? await del<{ reactions: Array<{ emoji: string; n: number }> }>(`/messages/${m.id}/reactions`, { emoji }) : await put<{ reactions: Array<{ emoji: string; n: number }> }>(`/messages/${m.id}/reactions`, { emoji });
@@ -60,10 +85,6 @@ function Bubble({ m, chat, onReply, onChange, onReport, onOpenMedia, onForward, 
     const next = await patch<MessageView>(`/messages/${m.id}`, { body: text.trim() });
     onChange(next);
     setEditing(false);
-  });
-  const remove = useAction(async () => {
-    await del(`/messages/${m.id}`);
-    onChange({ ...m, deleted: true, body: null, file: null, payload: {} });
   });
   const respond = useAction(async (response: string) => {
     const r = await put<{ counts: Record<string, number>; mine: string | null }>(`/messages/${m.id}/response`, { response: m.responses?.mine === response ? null : response });
@@ -81,14 +102,14 @@ function Bubble({ m, chat, onReply, onChange, onReport, onOpenMedia, onForward, 
   }
   const mine = m.isMine;
   const canEdit = mine && m.kind === 'text' && !m.deleted && Date.now() - new Date(m.createdAt).getTime() < EDIT_WINDOW_MS;
-  const canDelete = !m.deleted && (mine || chat.myRole !== 'member');
   const plan = m.kind === 'plan' ? (m.payload as { title?: string; when?: string; place?: string }) : null;
   const poll = m.kind === 'poll' ? (m.payload as { question?: string; options?: string[] }) : null;
   const pollTotal = poll ? Object.values(m.responses?.counts ?? {}).reduce((a, b) => a + b, 0) : 0;
   return (
-    <motion.div layout id={`msg-${m.id}`} initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className={cn('group flex gap-2 rounded-2xl transition-colors duration-700', mine ? 'justify-end' : 'justify-start', highlight && 'bg-accent-soft/70')}>
+    <motion.div layout id={`msg-${m.id}`} initial={{ opacity: 0, y: 8, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} onContextMenu={contextMenu} onPointerDown={pressStart} onPointerUp={pressEnd} onPointerLeave={pressEnd} onPointerCancel={pressEnd} onClick={selecting ? () => onSelect(m) : undefined} className={cn('group flex items-center gap-2 rounded-2xl transition-colors duration-700 [-webkit-touch-callout:none]', mine ? 'justify-end' : 'justify-start', highlight && 'bg-accent-soft/70', selecting && 'cursor-pointer', selected && 'bg-accent-soft/60')}>
+      {selecting && <span className={cn('grid h-6 w-6 shrink-0 place-items-center rounded-full border-2', selected ? 'border-accent bg-accent text-accent-ink' : 'border-text-3')} aria-hidden="true">{selected && <Check className="h-4 w-4" />}</span>}
       {!mine && chat.kind !== 'direct' && <span className="mt-auto shrink-0">{m.sender && <PersonAvatar person={{ ...m.sender, id: m.sender.alias ?? m.sender.id }} size="xs" />}</span>}
-      <div className={cn('flex max-w-[80%] flex-col', mine ? 'items-end' : 'items-start')}>
+      <div className={cn('flex max-w-[80%] flex-col', mine ? 'items-end' : 'items-start', selecting && 'pointer-events-none')}>
         {!mine && chat.kind !== 'direct' && <span className="mb-0.5 px-1 text-[12px] font-semibold text-text-3">{m.sender?.displayName}</span>}
         <div className={cn('relative rounded-2xl px-3.5 py-2 text-[15px] shadow-card', mine ? 'rounded-br-md bg-accent text-accent-ink' : 'rounded-bl-md bg-surface-2 text-text', m.deleted && 'italic opacity-70')}>
           {m.forwarded && !m.deleted && <p className="mb-1 flex items-center gap-1 text-[12px] italic opacity-75"><Forward className="h-3.5 w-3.5" aria-hidden="true" /> Forwarded</p>}
@@ -184,16 +205,19 @@ function Bubble({ m, chat, onReply, onChange, onReport, onOpenMedia, onForward, 
         <div className="flex items-center gap-1.5 px-1 pt-0.5 text-[11px] text-text-3">
           <span>{time(m.createdAt)}</span>
           {m.edited && !m.deleted && <span>· edited</span>}
-          {mine && !m.deleted && (chat.kind === 'direct' && readByOther ? <CheckCheck className="h-3.5 w-3.5 text-accent" aria-label="Seen" /> : <Check className="h-3.5 w-3.5" aria-label="Sent" />)}
-          {!m.deleted && (
+          {mine && !m.deleted && (m.pending === 'sending' ? <Clock className="h-3.5 w-3.5" aria-label="Sending" /> : m.pending === 'failed' ? null : chat.kind === 'direct' && readByOther ? <CheckCheck className="h-3.5 w-3.5 text-accent" aria-label="Seen" /> : <Check className="h-3.5 w-3.5" aria-label="Sent" />)}
+          {m.pending === 'failed' && (
+            <span className="flex items-center gap-2 text-danger">
+              <span>Not sent</span>
+              <button type="button" onClick={() => onRetry(m)} className="font-semibold underline">Retry</button>
+              <button type="button" onClick={() => onDiscard(m)} className="font-semibold underline">Remove</button>
+            </span>
+          )}
+          {!m.deleted && !m.pending && !selecting && (
             <span className="flex items-center gap-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100">
-              <button type="button" onClick={() => onReply(m)} aria-label="Reply" className="rounded-full p-1 hover:bg-surface-2"><CornerUpLeft className="h-3.5 w-3.5" aria-hidden="true" /></button>
-              <button type="button" onClick={() => setPicking((v) => !v)} aria-label="React" className="rounded-full p-1 hover:bg-surface-2"><SmilePlus className="h-3.5 w-3.5" aria-hidden="true" /></button>
-              {m.body && m.kind !== 'poll' && m.kind !== 'plan' && <button type="button" onClick={() => void navigator.clipboard.writeText(m.body ?? '').then(() => toast('Copied')).catch(() => undefined)} aria-label="Copy" className="rounded-full p-1 hover:bg-surface-2"><Copy className="h-3.5 w-3.5" aria-hidden="true" /></button>}
-              {['text', 'image', 'file', 'voice', 'video'].includes(m.kind) && <button type="button" onClick={() => onForward(m)} aria-label="Forward" className="rounded-full p-1 hover:bg-surface-2"><Forward className="h-3.5 w-3.5" aria-hidden="true" /></button>}
-              {canEdit && <button type="button" onClick={() => { setText(m.body ?? ''); setEditing(true); }} aria-label="Edit" className="rounded-full p-1 hover:bg-surface-2"><Pencil className="h-3.5 w-3.5" aria-hidden="true" /></button>}
-              {canDelete && <button type="button" onClick={() => void remove.run()} aria-label="Delete for everyone" className="rounded-full p-1 hover:bg-surface-2"><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /></button>}
-              {!mine && <button type="button" onClick={() => onReport(m)} aria-label="Report" className="rounded-full p-1 hover:bg-surface-2"><Flag className="h-3.5 w-3.5" aria-hidden="true" /></button>}
+              <button type="button" onClick={() => onReply(m)} aria-label="Reply" className="rounded-full p-1.5 hover:bg-surface-2"><CornerUpLeft className="h-4 w-4" aria-hidden="true" /></button>
+              <button type="button" onClick={() => setPicking((v) => !v)} aria-label="React" className="rounded-full p-1.5 hover:bg-surface-2"><SmilePlus className="h-4 w-4" aria-hidden="true" /></button>
+              <button type="button" onClick={() => onActions(m)} aria-label="More actions" className="rounded-full p-1.5 hover:bg-surface-2"><MoreHorizontal className="h-4 w-4" aria-hidden="true" /></button>
             </span>
           )}
         </div>
@@ -204,7 +228,7 @@ function Bubble({ m, chat, onReply, onChange, onReport, onOpenMedia, onForward, 
             </motion.div>
           )}
         </AnimatePresence>
-        {(react.error || edit.error || remove.error || respond.error || openSnap.error) && <p className="px-1 text-[12px] text-danger">{(react.error ?? edit.error ?? remove.error ?? respond.error ?? openSnap.error)!.message}</p>}
+        {(react.error || edit.error || respond.error || openSnap.error) && <p className="px-1 text-[12px] text-danger">{(react.error ?? edit.error ?? respond.error ?? openSnap.error)!.message}</p>}
       </div>
     </motion.div>
   );
@@ -232,7 +256,7 @@ export function LiveConversation({ chatId }: { chatId: string }) {
   const config = usePublicConfig();
   const maxMb = config.data?.uploads.purposes.message?.maxMb ?? config.data?.uploads.maxMb ?? 25;
   const chat = useQuery<ChatDetail>(`chats:one:${chatId}`, (signal) => get(`/chats/${chatId}`, undefined, signal));
-  const [messages, setMessages] = useState<MessageView[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [older, setOlder] = useState<string | null>(null);
   const [newer, setNewer] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -250,6 +274,11 @@ export function LiveConversation({ chatId }: { chatId: string }) {
   const [forwarding, setForwarding] = useState<string | null>(null);
   const [reporting, setReporting] = useState<MessageView | null>(null);
   const [highlight, setHighlight] = useState<string | null>(null);
+  const [actionFor, setActionFor] = useState<ChatMessage | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [confirm, setConfirm] = useState<{ kind: 'unsend' | 'hide'; ids: string[] } | { kind: 'clear' | 'delete' | 'exit' } | null>(null);
   const [atBottomState, setAtBottomState] = useState(true);
   const [unseen, setUnseen] = useState(0);
   const [presence, setPresence] = useState<Presence | null>(null);
@@ -415,6 +444,108 @@ export function LiveConversation({ chatId }: { chatId: string }) {
   );
   const send = useAction(sendRaw);
 
+  // A text message appears the moment it is sent (with a clock) and is confirmed when the server answers;
+  // if that fails it stays with Retry / Remove, and a retry cannot send it twice (same clientId).
+  const deliver = useCallback(
+    async (cid: string, body: string, replyToId: string | undefined) => {
+      try {
+        const sent = await post<MessageView>(`/chats/${chatId}/messages`, { clientId: cid, kind: 'text', body, replyToId });
+        setMessages((list) => {
+          const rest = list.filter((x) => x.id !== `tmp-${cid}` && x.id !== sent.id);
+          return [...rest, sent].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+        });
+        invalidate('chats:list');
+      } catch (err) {
+        setMessages((list) => list.map((x) => (x.id === `tmp-${cid}` ? { ...x, pending: 'failed' as const } : x)));
+        toast(errorMessage(err));
+      }
+    },
+    [chatId, toast],
+  );
+  const sendText = (body: string) => {
+    const cid = clientId();
+    const reply = replyTo;
+    const temp: ChatMessage = {
+      id: `tmp-${cid}`,
+      chatId,
+      kind: 'text',
+      body,
+      sender: null,
+      isMine: true,
+      replyTo: reply ? { id: reply.id, body: reply.body, senderName: reply.isMine ? 'You' : (reply.sender?.displayName ?? null) } : null,
+      file: null,
+      snap: null,
+      payload: {},
+      reactions: [],
+      responses: null,
+      edited: false,
+      forwarded: false,
+      deleted: false,
+      createdAt: new Date().toISOString(),
+      pending: 'sending',
+    };
+    atBottom.current = true;
+    setMessages((list) => [...list, temp]);
+    setReplyTo(null);
+    void deliver(cid, body, reply?.id);
+  };
+  const retry = (m: ChatMessage) => {
+    const cid = m.id.replace(/^tmp-/, '');
+    setMessages((list) => list.map((x) => (x.id === m.id ? { ...x, pending: 'sending' as const } : x)));
+    void deliver(cid, m.body ?? '', m.replyTo?.id);
+  };
+  const discard = (m: ChatMessage) => setMessages((list) => list.filter((x) => x.id !== m.id));
+
+  // ---- message menu, selecting several messages, and deleting
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelected([]);
+  };
+  const toggleSelect = (m: ChatMessage) => setSelected((list) => (list.includes(m.id) ? list.filter((x) => x !== m.id) : [...list, m.id]));
+  const reactTo = async (m: ChatMessage, emoji: string) => {
+    const mine = m.reactions.find((r) => r.emoji === emoji)?.mine;
+    try {
+      const res = mine ? await del<{ reactions: Array<{ emoji: string; n: number }> }>(`/messages/${m.id}/reactions`, { emoji }) : await put<{ reactions: Array<{ emoji: string; n: number }> }>(`/messages/${m.id}/reactions`, { emoji });
+      setMessages((list) => list.map((x) => (x.id === m.id ? { ...x, reactions: res.reactions.map((r) => ({ emoji: r.emoji, count: r.n, mine: r.emoji === emoji ? !mine : (x.reactions.find((y) => y.emoji === r.emoji)?.mine ?? false) })) } : x)));
+    } catch (err) {
+      toast(errorMessage(err));
+    }
+  };
+  const doConfirm = useAction(async () => {
+    if (!confirm) return;
+    if (confirm.kind === 'unsend') {
+      const r = await post<{ ids: string[] }>(`/chats/${chatId}/messages/unsend`, { messageIds: confirm.ids });
+      const gone = new Set(r.ids);
+      setMessages((list) => list.map((x) => (gone.has(x.id) ? { ...x, deleted: true, body: null, file: null, payload: {} } : x)));
+      toast(r.ids.length ? (r.ids.length === 1 ? 'Message unsent' : `${r.ids.length} messages unsent`) : 'Nothing could be unsent');
+      exitSelect();
+    } else if (confirm.kind === 'hide') {
+      await post(`/chats/${chatId}/messages/hide`, { messageIds: confirm.ids });
+      const gone = new Set(confirm.ids);
+      setMessages((list) => list.filter((x) => !gone.has(x.id)));
+      toast('Deleted for you');
+      exitSelect();
+    } else if (confirm.kind === 'clear') {
+      await post(`/chats/${chatId}/clear`);
+      setMessages([]);
+      invalidate('chats:list');
+      toast('Chat cleared');
+    } else if (confirm.kind === 'delete') {
+      await del(`/chats/${chatId}`);
+      invalidate('chats:list');
+      refreshBadges();
+      router.replace('/chats');
+    } else if (confirm.kind === 'exit') {
+      if (!user) return;
+      await del(`/chats/${chatId}/members/${user.id}`);
+      invalidate('chats:list');
+      refreshBadges();
+      toast('You left the group');
+      router.replace('/chats');
+    }
+    setConfirm(null);
+  });
+
   const sendVoice = async (file: File) => {
     setRecording(false);
     setVoiceUploading(true);
@@ -437,9 +568,9 @@ export function LiveConversation({ chatId }: { chatId: string }) {
 
   const submit = () => {
     const body = text.trim();
-    if (!body || send.pending) return;
+    if (!body) return;
     setText('');
-    void send.run({ kind: 'text', body });
+    sendText(body);
   };
 
   const choose = (choice: 'poll' | 'plan' | 'location' | 'contact') => {
@@ -501,10 +632,12 @@ export function LiveConversation({ chatId }: { chatId: string }) {
             trigger={<MoreVertical className="h-5 w-5" aria-hidden="true" />}
             items={[
               { label: c.kind === 'direct' ? 'Contact info' : 'Group info', icon: Info, onSelect: () => setSheet('info') },
+              { label: 'Select messages', icon: CheckSquare, onSelect: () => setSelectMode(true) },
               { label: c.settings.pinned ? 'Unpin' : 'Pin to top', icon: Pin, onSelect: () => void settings.run({ pinned: !c.settings.pinned }, c.settings.pinned ? 'Unpinned' : 'Pinned') },
               { label: c.settings.muted ? 'Unmute' : 'Mute for 8 hours', icon: c.settings.muted ? Bell : BellOff, onSelect: () => void settings.run({ muteHours: c.settings.muted ? 0 : 8 }, c.settings.muted ? 'Unmuted' : 'Muted for 8 hours') },
               { label: c.settings.archived ? 'Move to inbox' : 'Archive', icon: Archive, onSelect: () => void settings.run({ archived: !c.settings.archived }, c.settings.archived ? 'Moved to inbox' : 'Archived') },
-              ...(c.kind !== 'direct' ? [{ label: 'Members', icon: Users, onSelect: () => setSheet('info') }, { label: 'Exit group', icon: LogOut, danger: true, onSelect: () => setSheet('info') }] : []),
+              { label: 'Clear chat', icon: Eraser, onSelect: () => setConfirm({ kind: 'clear' }) },
+              ...(c.kind === 'direct' ? [{ label: 'Delete chat', icon: Trash2, danger: true, onSelect: () => setConfirm({ kind: 'delete' }) }] : [{ label: 'Members', icon: Users, onSelect: () => setSheet('info') }, { label: 'Exit group', icon: LogOut, danger: true, onSelect: () => setConfirm({ kind: 'exit' }) }]),
             ]}
           />
         )}
@@ -551,9 +684,15 @@ export function LiveConversation({ chatId }: { chatId: string }) {
                       readByOther={readByOther && m.id === lastMine?.id}
                       highlight={highlight === m.id}
                       onReply={setReplyTo}
-                      onReport={setReporting}
                       onOpenMedia={openMedia}
-                      onForward={(x) => setForwarding(x.id)}
+                      onActions={setActionFor}
+                      onRetry={retry}
+                      onDiscard={discard}
+                      onSelect={toggleSelect}
+                      selecting={selectMode}
+                      selected={selected.includes(m.id)}
+                      editRequested={editId === m.id}
+                      onEditStarted={() => setEditId(null)}
                       onChange={(next) => setMessages((list) => (next ? list.map((x) => (x.id === next.id ? next : x)) : list.filter((x) => x.id !== m.id)))}
                     />
                   </div>
@@ -586,7 +725,16 @@ export function LiveConversation({ chatId }: { chatId: string }) {
       </div>
 
       <div className="shrink-0 border-t border-border bg-[var(--surface-solid)] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
-        {c && !c.canPost ? (
+        {selectMode && c ? (
+          <div className="flex flex-wrap items-center gap-2 py-1">
+            <button type="button" onClick={exitSelect} aria-label="Cancel selecting" className="grid h-10 w-10 place-items-center rounded-full hover:bg-surface-2"><X className="h-5 w-5" aria-hidden="true" /></button>
+            <span className="min-w-0 flex-1 font-semibold">{selected.length ? `${selected.length} selected` : 'Select messages'}</span>
+            <Button size="sm" variant="secondary" disabled={!selected.length} onClick={() => setConfirm({ kind: 'hide', ids: selected })}>Delete for me</Button>
+            {selected.every((id) => { const x = messages.find((y) => y.id === id); return x && !x.deleted && !x.pending && (x.isMine || c.myRole !== 'member'); }) && selected.length > 0 && (
+              <Button size="sm" variant="danger" onClick={() => setConfirm({ kind: 'unsend', ids: selected })}>Unsend</Button>
+            )}
+          </div>
+        ) : c && !c.canPost ? (
           <p className="py-2 text-center text-[13px] text-text-3">{c.onlyAdminsPost ? 'Only admins can post here.' : 'You cannot send messages in this chat.'}</p>
         ) : recording ? (
           <VoiceRecorder onSend={(f) => void sendVoice(f)} onCancel={() => setRecording(false)} onError={(msg) => toast(msg)} />
@@ -628,8 +776,8 @@ export function LiveConversation({ chatId }: { chatId: string }) {
                 className="max-h-36 min-h-11 flex-1 resize-none rounded-2xl border border-border bg-surface px-4 py-2.5 text-[15px] focus:border-accent focus:outline-none"
               />
               {text.trim() ? (
-                <motion.button type="submit" whileTap={{ scale: 0.9 }} disabled={send.pending} aria-label="Send" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-accent-ink disabled:opacity-50">
-                  {send.pending ? <Spinner /> : <Send className="h-5 w-5" aria-hidden="true" />}
+                <motion.button type="submit" whileTap={{ scale: 0.9 }} aria-label="Send" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-accent-ink">
+                  <Send className="h-5 w-5" aria-hidden="true" />
                 </motion.button>
               ) : (
                 <motion.button type="button" whileTap={{ scale: 0.9 }} onClick={() => setRecording(true)} disabled={voiceUploading} aria-label="Record a voice message" className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent text-accent-ink disabled:opacity-50">
@@ -662,6 +810,49 @@ export function LiveConversation({ chatId }: { chatId: string }) {
       {viewer && <MediaViewer items={viewer.items} start={viewer.index} onClose={() => setViewer(null)} onForward={(id) => { setViewer(null); setForwarding(id); }} />}
       {forwarding && <ForwardSheet messageId={forwarding} onClose={() => setForwarding(null)} />}
       {reporting && <ReportSheet open onClose={() => setReporting(null)} targetType="message" targetId={reporting.id} label="this message" />}
+      {actionFor && c && (
+        <MessageActionSheet
+          m={actionFor}
+          canEdit={actionFor.isMine && actionFor.kind === 'text' && !actionFor.deleted && Date.now() - new Date(actionFor.createdAt).getTime() < EDIT_WINDOW_MS}
+          canUnsend={!actionFor.deleted && (actionFor.isMine || c.myRole !== 'member')}
+          onClose={() => setActionFor(null)}
+          onReact={(emoji) => void reactTo(actionFor, emoji)}
+          onReply={() => setReplyTo(actionFor)}
+          onCopy={() => void navigator.clipboard.writeText(actionFor.body ?? '').then(() => toast('Copied')).catch(() => undefined)}
+          onForward={() => setForwarding(actionFor.id)}
+          onEdit={() => setEditId(actionFor.id)}
+          onSelect={() => {
+            setSelectMode(true);
+            setSelected([actionFor.id]);
+          }}
+          onDeleteForMe={() => setConfirm({ kind: 'hide', ids: [actionFor.id] })}
+          onUnsend={() => setConfirm({ kind: 'unsend', ids: [actionFor.id] })}
+          onReport={() => setReporting(actionFor)}
+        />
+      )}
+      <ConfirmDialog
+        open={Boolean(confirm)}
+        onClose={() => setConfirm(null)}
+        onConfirm={() => void doConfirm.run()}
+        title={
+          confirm?.kind === 'unsend' ? (confirm.ids.length === 1 ? 'Unsend this message?' : `Unsend ${confirm.ids.length} messages?`) :
+          confirm?.kind === 'hide' ? (confirm.ids.length === 1 ? 'Delete this message for you?' : `Delete ${confirm.ids.length} messages for you?`) :
+          confirm?.kind === 'clear' ? 'Clear this chat?' :
+          confirm?.kind === 'delete' ? 'Delete this chat?' :
+          'Leave this group?'
+        }
+        description={
+          confirm?.kind === 'unsend' ? 'It is removed for everyone in the chat. This cannot be undone.' :
+          confirm?.kind === 'hide' ? 'It disappears for you only. Everyone else still sees it.' :
+          confirm?.kind === 'clear' ? 'All messages are removed for you only. The chat stays in your list.' :
+          confirm?.kind === 'delete' ? 'The chat and its messages are removed for you only. It comes back if they message you again.' :
+          'You will stop getting its messages. You can be added again by an admin.'
+        }
+        confirmLabel={confirm?.kind === 'unsend' ? 'Unsend' : confirm?.kind === 'exit' ? 'Leave group' : confirm?.kind === 'hide' ? 'Delete for me' : confirm?.kind === 'clear' ? 'Clear chat' : 'Delete chat'}
+        danger
+        pending={doConfirm.pending}
+        error={doConfirm.error?.message}
+      />
       {chat.error && <ErrorState error={chat.error} onRetry={chat.reload} className="m-4" />}
       {settings.error && <FormAlert className="m-3">{settings.error.message}</FormAlert>}
     </div>
