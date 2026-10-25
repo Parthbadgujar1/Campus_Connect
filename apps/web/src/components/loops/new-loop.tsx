@@ -8,7 +8,7 @@ import type { FileView, PostView } from '@/lib/api/types';
 import { usePublicConfig } from '@/components/shell/public-shell';
 import { Sheet } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Field, Select, Textarea } from '@/components/ui/fields';
+import { Field, Textarea } from '@/components/ui/fields';
 import { FormAlert, Spinner } from '@/components/ui/states';
 import { hashtagsIn } from '@/components/common/rich-text';
 import { ensureDuration, formatBytes } from './media';
@@ -48,7 +48,6 @@ export function NewLoop({ onClose, onPosted }: { onClose: () => void; onPosted: 
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(true);
   const [caption, setCaption] = useState('');
-  const [audience, setAudience] = useState<'college' | 'department' | 'year'>('college');
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -117,7 +116,7 @@ export function NewLoop({ onClose, onPosted }: { onClose: () => void; onPosted: 
       const video = await uploadWithProgress<FileView>('post', file, file.name || 'loop.mp4', (f) => setProgress(f * 0.92), controller.signal);
       const cover = await uploadWithProgress<FileView>('post', coverBlob, 'cover.jpg', (f) => setProgress(0.92 + f * 0.06), controller.signal);
       setProgress(0.99);
-      const created = await post<PostView>('/posts', { body: caption.trim(), attachments: [video.id], coverId: cover.id, tags: hashtagsIn(caption), audience });
+      const created = await post<PostView>('/posts', { body: caption.trim(), attachments: [video.id], coverId: cover.id, tags: hashtagsIn(caption), audience: 'college' });
       invalidate('feed:');
       onPosted(created);
     } catch (err) {
@@ -206,13 +205,6 @@ export function NewLoop({ onClose, onPosted }: { onClose: () => void; onPosted: 
           </div>
           <Field label="Caption" htmlFor="loop-caption" hint={`${caption.length}/${CAPTION_MAX} · #hashtags and @mentions work`}>
             <Textarea id="loop-caption" rows={3} value={caption} maxLength={CAPTION_MAX} disabled={busy} onChange={(e) => setCaption(e.target.value)} placeholder="Write a caption… #hackathon @friend" />
-          </Field>
-          <Field label="Who can see it" htmlFor="loop-audience">
-            <Select id="loop-audience" value={audience} disabled={busy} onChange={(e) => setAudience(e.target.value as typeof audience)}>
-              <option value="college">Everyone at your college</option>
-              <option value="department">Your department</option>
-              <option value="year">Your year</option>
-            </Select>
           </Field>
         </div>
       )}

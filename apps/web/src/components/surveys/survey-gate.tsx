@@ -49,7 +49,7 @@ export function SurveyGate() {
                 <ClipboardCheck className="h-6 w-6" aria-hidden="true" />
               </span>
               <div className="min-w-0">
-                <p className="text-[13px] font-semibold uppercase tracking-wide text-accent">Required by your college</p>
+                <p className="text-[13px] font-semibold uppercase tracking-wide text-accent">Required</p>
                 <h2 id="survey-gate-title" className="mt-0.5 text-[24px] font-bold leading-tight">{due.title}</h2>
                 {due.description && <p className="mt-1.5 text-[15px] text-text-2">{due.description}</p>}
               </div>

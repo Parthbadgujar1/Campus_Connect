@@ -42,7 +42,7 @@ export default function PrivacyControlsPage() {
       <PageHeader title="Privacy controls" back backHref="/settings" subtitle="Choose what others can see and do" />
 
       <section className="mt-5" aria-label="Your profile">
-        <SectionHeader title="Your profile" description="Only people at your college can ever see your profile." />
+        <SectionHeader title="Your profile" description="Choose who can see your profile and what it shows." />
         <Card className="space-y-4 p-4">
           <div className="space-y-2">
             <p className="font-sans text-sm font-semibold">Who can see your full profile</p>

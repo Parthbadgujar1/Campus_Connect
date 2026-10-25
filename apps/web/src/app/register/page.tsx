@@ -2,28 +2,20 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ExternalLink, MailCheck } from 'lucide-react';
 import { AuthLayout, Checkbox, FormField } from '@/components/auth/auth-layout';
 import { Button } from '@/components/ui/button';
-import { Input, Select } from '@/components/ui/fields';
+import { Input } from '@/components/ui/fields';
 import { PasswordHints, PasswordInput } from '@/components/ui/password-input';
 import { FormAlert, Spinner } from '@/components/ui/states';
-import { get, isApiError, post } from '@/lib/api/client';
-import { useQuery } from '@/lib/api/hooks';
+import { isApiError, post } from '@/lib/api/client';
 import { usePublicConfig } from '@/components/shell/public-shell';
 import type { SessionPayload } from '@/lib/api/types';
 import { useSession } from '@/lib/session';
 
 // Sign up like any app: name, email, mobile, date of birth and a password. The age is worked out
 // from the date of birth (18 or over). Everyone joins as a student and is signed in straight away.
-
-interface College {
-  id: string;
-  name: string;
-  shortName: string;
-  city: string | null;
-}
 
 const MINIMUM_AGE = 18;
 
@@ -42,8 +34,6 @@ export default function RegisterPage() {
   const config = usePublicConfig();
   const router = useRouter();
   const { adopt } = useSession();
-  const colleges = useQuery<{ items: College[] }>('meta:colleges', (signal) => get('/meta/colleges', undefined, signal));
-  const [collegeId, setCollegeId] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -61,12 +51,6 @@ export default function RegisterPage() {
   const age = useMemo(() => ageFrom(dob), [dob]);
   const today = new Date().toISOString().slice(0, 10);
 
-  // With a single college on this server, it is chosen for you.
-  useEffect(() => {
-    const items = colleges.data?.items ?? [];
-    if (items.length === 1 && !collegeId) setCollegeId(items[0]!.id);
-  }, [colleges.data, collegeId]);
-
   const validate = () => {
     const e: Record<string, string> = {};
     if (name.trim().length < 2) e.displayName = 'Enter your full name.';
@@ -76,7 +60,6 @@ export default function RegisterPage() {
     else if (age < MINIMUM_AGE) e.dateOfBirth = `CampusConnect is for people aged ${MINIMUM_AGE} or over.`;
     if (password.length < 10) e.password = 'Use at least 10 characters.';
     if (confirm !== password) e.confirm = 'The two passwords do not match.';
-    if (!collegeId) e.collegeId = 'Choose your college.';
     if (!terms) e.acceptTerms = 'Please accept the terms and privacy policy to continue.';
     return e;
   };
@@ -100,7 +83,6 @@ export default function RegisterPage() {
         displayName: name.trim(),
         phone: phone.trim(),
         dateOfBirth: dob,
-        collegeId,
         acceptTerms: terms,
         marketingOptIn: marketing,
       });
@@ -165,7 +147,6 @@ export default function RegisterPage() {
     );
   }
 
-  const collegeList = colleges.data?.items ?? [];
   const err = (k: string) => errors[k];
 
   return (
@@ -187,7 +168,7 @@ export default function RegisterPage() {
         <FormField id="name" label="Full name" error={err('displayName')}>
           <Input id="name" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} aria-invalid={Boolean(err('displayName')) || undefined} />
         </FormField>
-        <FormField id="email" label="Email" error={err('email')} hint="Any email you use: Gmail, Outlook, your college address…">
+        <FormField id="email" label="Email" error={err('email')} hint="Any email you use: Gmail, Outlook, Yahoo…">
           <Input id="email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false} required placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} aria-invalid={Boolean(err('email')) || undefined} />
         </FormField>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -209,20 +190,6 @@ export default function RegisterPage() {
         <FormField id="confirm" label="Confirm password" error={err('confirm')}>
           <PasswordInput id="confirm" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} invalid={Boolean(err('confirm'))} />
         </FormField>
-
-        {collegeList.length !== 1 && (
-          <FormField id="collegeId" label="Your college" error={err('collegeId')}>
-            <Select id="collegeId" value={collegeId} onChange={(e) => setCollegeId(e.target.value)} disabled={colleges.loading} aria-invalid={Boolean(err('collegeId')) || undefined}>
-              <option value="">{colleges.loading ? 'Loading colleges…' : 'Choose your college'}</option>
-              {collegeList.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                  {c.city ? `, ${c.city}` : ''}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-        )}
 
         <fieldset className="space-y-3 pt-1">
           <legend className="sr-only">Agreements</legend>

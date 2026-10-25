@@ -22,7 +22,7 @@ export default function TermsPage() {
             <ul className="list-disc space-y-1.5 pl-6">
               <li>You must be 18 or older.</li>
               <li>You sign up with your own email address and your real name, and only one account per person.</li>
-              <li>Faculty and industry-expert roles are given after a review by your college’s admins.</li>
+              <li>Special roles, such as moderator, are given by the CampusConnect admins.</li>
             </ul>
           ),
         },

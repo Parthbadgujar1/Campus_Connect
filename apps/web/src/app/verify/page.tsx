@@ -79,7 +79,7 @@ export default function VerifyPage() {
 
       {!verified && (
         <section className="mt-8" aria-label="Get verified">
-          <SectionHeader title="Get the verified badge" description="Upload a photo of your college ID card. Only the admin office sees it, and it is deleted with your account." />
+          <SectionHeader title="Get the verified badge" description="Upload a photo of an ID card. Only the admin office sees it, and it is deleted with your account." />
           {pendingBadge ? (
             <FormAlert tone="info">Your ID card is being reviewed, usually within a day.</FormAlert>
           ) : (

@@ -22,11 +22,10 @@ browser ──> one public domain ──┬─ /v1, /health, /docs ─> API  ┐
    | `MONGODB_URL` | `${{MongoDB.MONGO_URL}}` |
    | `BOOTSTRAP_ADMIN_EMAIL` | your email (this becomes the first admin) |
    | `BOOTSTRAP_ADMIN_PASSWORD` | a password of 10+ characters |
-   | `BOOTSTRAP_COLLEGE_NAME` | your college's name |
 
 4. **Settings → Networking → Generate Domain**, then let it redeploy.
 5. Open the domain and sign in with the admin email and password. Then **delete
-   `BOOTSTRAP_ADMIN_PASSWORD`** and add departments and email domains in **Admin → Colleges**.
+   `BOOTSTRAP_ADMIN_PASSWORD`**.
 
 Everything else is filled in for you: the public URL comes from Railway's domain, the three secrets
 are derived from the database URL (so they stay the same across deploys), cookies are secure, and
@@ -51,7 +50,7 @@ Any variable you set yourself overrides the defaults. The full list is in `apps/
 - **Sign-in does nothing:** the service has no public domain yet (step 4), and sign-in needs https.
 - **`/health/ready` shows `unavailable`:** the app cannot reach MongoDB; check the `MONGODB_URL` reference.
 - **No admin exists:** `BOOTSTRAP_ADMIN_EMAIL` or the password (10+ characters) was missing at start.
-  Add them and redeploy; an existing admin or college is never overwritten.
+  Add them and redeploy; an existing admin is never overwritten.
 
 ## Good to know
 

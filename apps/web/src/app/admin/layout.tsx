@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { BarChart3, Building2, ClipboardList, Inbox, LayoutGrid, MessageSquareHeart, Server, ShieldAlert, Users } from 'lucide-react';
+import { BarChart3, ClipboardList, Inbox, LayoutGrid, MessageSquareHeart, Server, ShieldAlert, Users } from 'lucide-react';
 import { PageHeader } from '@/components/ui/layout';
 import { useSession } from '@/lib/session';
 import { can, ROLE_LABEL, type Capability } from '@/lib/roles';
@@ -22,7 +22,6 @@ const SECTIONS: Array<{ href: string; label: string; icon: LucideIcon; needs: Ca
   { href: '/admin/surveys', label: 'Surveys', icon: ClipboardList, needs: 'admin.surveys' },
   { href: '/admin/feedback', label: 'Feedback', icon: MessageSquareHeart, needs: 'admin.feedback' },
   { href: '/admin/inbox', label: 'Inbox', icon: Inbox, needs: 'admin.system' },
-  { href: '/admin/colleges', label: 'Colleges', icon: Building2, needs: 'admin.system' },
   { href: '/admin/system', label: 'System', icon: Server, needs: 'admin.system' },
 ];
 
@@ -35,7 +34,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto w-full max-w-6xl pb-28 md:pb-12">
       <div className="px-4 md:px-8">
-        <PageHeader title={title} subtitle={user ? `${ROLE_LABEL[user.role]} tools for your college` : undefined} back backHref="/campus" />
+        <PageHeader title={title} subtitle={user ? `${ROLE_LABEL[user.role]} tools` : undefined} back backHref="/campus" />
       </div>
       {sections.length > 1 && (
         <nav aria-label="Admin sections" className="font-sans no-scrollbar mt-1 flex gap-2 overflow-x-auto px-4 pb-1 md:px-8">

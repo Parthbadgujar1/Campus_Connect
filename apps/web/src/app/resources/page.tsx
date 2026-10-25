@@ -435,7 +435,7 @@ function ShelfInner() {
     <div className="mx-auto w-full max-w-3xl px-4 pb-28 md:px-8 md:pb-12">
       <PageHeader
         title="Shelf"
-        subtitle={total !== undefined ? `${total} notes, papers and guides from your college` : 'Notes, papers and guides'}
+        subtitle={total !== undefined ? `${total} notes, papers and guides` : 'Notes, papers and guides'}
         back
         backHref="/campus"
         actions={

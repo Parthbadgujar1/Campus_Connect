@@ -213,7 +213,7 @@ function RequestCard({ r, onDone }: { r: VerificationRow; onDone: () => void }) 
         </div>
         <Badge tone={roleRequest ? 'warning' : 'info'}>{KIND_LABEL[r.kind]}</Badge>
       </div>
-      <RoleInfoList info={{ Mobile: r.phone, Age: r.age, College: r.college, ...r.roleInfo }} />
+      <RoleInfoList info={{ Mobile: r.phone, Age: r.age, ...r.roleInfo }} />
       {r.note && <p className="rounded-xl bg-surface-2 px-3 py-2 text-[14px]">“{r.note}”</p>}
       {r.documentUrl && (
         <a href={r.documentUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-[14px] font-semibold text-accent">

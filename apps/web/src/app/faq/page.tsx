@@ -12,16 +12,14 @@ interface QA {
 }
 
 const FAQ: QA[] = [
-  { topic: 'Getting started', q: 'Who can join CampusConnect?', a: <p>Students, faculty and industry experts of colleges that are on CampusConnect, aged 18 or over. You sign up with any email address and a password, and choose your college. Faculty and expert roles are confirmed by the college before they are switched on.</p> },
-  { topic: 'Getting started', q: 'My college is not in the list. What now?', a: <p>Your college may not be on CampusConnect yet. Ask your college office, or <Link href="/contact?topic=partnership" className="text-accent hover:underline">tell us</Link> and we will reach out.</p> },
+  { topic: 'Getting started', q: 'Who can join CampusConnect?', a: <p>Anyone aged 18 or over. You sign up with any email address and a password, and you are in.</p> },
   { topic: 'Getting started', q: 'I did not get the verification email.', a: <p>Check spam and promotions. The link works for 24 hours. On the sign-in page, enter your email and password and choose “Send the verification email again”.</p> },
   { topic: 'Getting started', q: 'Does it cost anything?', a: <p>No. CampusConnect is free, with no ads, no hidden fees and no in-app purchases.</p> },
   { topic: 'Account & security', q: 'I forgot my password.', a: <p>Use <Link href="/forgot-password" className="text-accent hover:underline">Forgot password</Link>. Resetting it signs you out on every other device.</p> },
   { topic: 'Account & security', q: 'How do I sign out of a device I lost?', a: <p>Settings &gt; Password &amp; devices shows every signed-in device. Sign it out, then change your password.</p> },
   { topic: 'Account & security', q: 'How do I delete my account?', a: <p>Settings &gt; Your data &amp; account &gt; Delete my account. Your profile is hidden immediately and everything is permanently deleted after 30 days. Sign in within those 30 days if you change your mind.</p> },
   { topic: 'Privacy', q: 'Can anyone see who posted anonymously?', a: <p>No. Not other students, not space owners and not moderators. Only in serious safety or legal cases can it be revealed, and that needs two different admins and is permanently logged.</p> },
-  { topic: 'Privacy', q: 'Can people from other colleges see my profile?', a: <p>No. Your profile and posts are visible only inside your college, and you control the details in Settings &gt; Privacy controls.</p> },
-  { topic: 'Privacy', q: 'Can I get a copy of my data?', a: <p>Yes: Settings &gt; Your data &amp; account &gt; Request a copy. We email you when it is ready (usually minutes).</p> },
+  { topic: 'Privacy', q: 'Who can see my profile?', a: <p>Other people on CampusConnect can see your profile and posts. You control the details in Settings &gt; Privacy controls, and anonymous posts never show your name.</p> },
   { topic: 'Privacy', q: 'What cookies do you use?', a: <p>Only the ones needed to keep you signed in safely. See the <Link href="/cookies" className="text-accent hover:underline">cookie policy</Link>.</p> },
   { topic: 'Using CampusConnect', q: 'How do I change the theme or font?', a: <p>Tap the Appearance button (sun/moon icon) or go to Settings &gt; Appearance. Choose Handwritten, Classic, your device’s System font, or Easy to read. Your choice follows you to every device.</p> },
   { topic: 'Using CampusConnect', q: 'What are the small dots on some sections?', a: <p>A dot marks a section you have not opened yet, so you can explore everything. It disappears once you open it.</p> },

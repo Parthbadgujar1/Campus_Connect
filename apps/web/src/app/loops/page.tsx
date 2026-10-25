@@ -24,7 +24,7 @@ const isLoop = (p: PostView) => p.attachments.some((a) => a.kind === 'video' && 
 
 function EndCard({ kind, onTop, onNew }: { kind: 'empty' | 'following-empty' | 'end'; onTop: () => void; onNew: () => void }) {
   const copy = {
-    empty: { icon: Clapperboard, title: 'No loops yet', text: 'Loops are short videos from people at your college. Post the first one.' },
+    empty: { icon: Clapperboard, title: 'No loops yet', text: 'Loops are short videos from people on CampusConnect. Post the first one.' },
     'following-empty': { icon: UsersRound, title: 'Nothing from people you follow', text: 'Follow people from their loops or profiles, and their new loops show up here.' },
     end: { icon: CheckCircle2, title: 'You’re all caught up', text: 'You have seen every loop here. New ones appear as people post them.' },
   }[kind];

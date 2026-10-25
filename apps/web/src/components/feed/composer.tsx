@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import { BarChart3, Ghost, ImagePlus, Loader2, MessageCircleQuestion, Paperclip, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Select, Textarea } from '@/components/ui/fields';
+import { Textarea } from '@/components/ui/fields';
 import { PersonAvatar } from '@/components/ui/person-avatar';
 import { FormAlert, Spinner } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
@@ -20,13 +20,6 @@ interface Pending {
   error?: string;
 }
 
-const AUDIENCES = [
-  { value: 'college', label: 'Whole campus' },
-  { value: 'department', label: 'My department' },
-  { value: 'year', label: 'My year' },
-  { value: 'division', label: 'My division' },
-] as const;
-
 /** Writes a post. The feed passes onPosted to show it at the top straight away. */
 export function Composer({ onPosted, spaceId, placeholder = 'Share a thought, a win or a question' }: { onPosted: (p: PostView) => void; spaceId?: string; placeholder?: string }) {
   const { user } = useSession();
@@ -34,7 +27,6 @@ export function Composer({ onPosted, spaceId, placeholder = 'Share a thought, a 
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState('');
   const [kind, setKind] = useState<Kind>('post');
-  const [audience, setAudience] = useState<(typeof AUDIENCES)[number]['value']>('college');
   const [anonymous, setAnonymous] = useState(false);
   const [tags, setTags] = useState('');
   const [options, setOptions] = useState(['', '']);
@@ -78,7 +70,7 @@ export function Composer({ onPosted, spaceId, placeholder = 'Share a thought, a 
       const created = await post<PostView>('/posts', {
         body: body.trim(),
         kind,
-        audience: spaceId ? 'space' : audience,
+        audience: spaceId ? 'space' : 'college',
         spaceId,
         anonymous,
         tags: tags.split(/[\s,]+/).map((t) => t.replace(/^#/, '').toLowerCase()).filter(Boolean).slice(0, 10),
@@ -164,18 +156,6 @@ export function Composer({ onPosted, spaceId, placeholder = 'Share a thought, a 
       )}
 
       <div className="font-sans mt-3 grid gap-2 sm:grid-cols-2">
-        {!spaceId && (
-          <div>
-            <label htmlFor="composer-audience" className="sr-only">Who can see this</label>
-            <Select id="composer-audience" value={audience} onChange={(e) => setAudience(e.target.value as typeof audience)} className="h-10 text-[14px]">
-              {AUDIENCES.map((a) => (
-                <option key={a.value} value={a.value} disabled={a.value !== 'college' && !user?.profile.departmentId}>
-                  {a.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-        )}
         <div>
           <label htmlFor="composer-tags" className="sr-only">Tags</label>
           <input id="composer-tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="#tags, separated by spaces"

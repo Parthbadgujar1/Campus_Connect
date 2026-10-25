@@ -19,7 +19,7 @@ import { useSession } from '@/lib/session';
 import { cn } from '@/lib/utils';
 import { useState, Suspense } from 'react';
 
-type Scope = 'all' | 'following' | 'campus' | 'class';
+type Scope = 'all' | 'following';
 
 function Notices() {
   const q = useQuery<Page<{ id: string; title: string; authorLabel: string; publishedAt: string; pinned: boolean; category: string }>>('home:notices', (s) => get('/announcements', { limit: 3 }, s));
@@ -118,7 +118,7 @@ function Feed() {
 
   return (
     <section aria-label="Posts for you">
-      <SectionHeader tone="pink" title="For you" description="Posts from your college, your class and people you follow" />
+      <SectionHeader tone="pink" title="For you" description="Posts from everyone, and the people you follow" />
       <Composer onPosted={(p) => feed.setItems((items) => [p, ...items])} />
       {tag ? (
         <p className="font-sans mt-4 inline-flex items-center gap-2 rounded-full bg-accent-soft px-3 py-1.5 text-[13px] font-semibold text-accent-soft-ink">
@@ -134,8 +134,6 @@ function Feed() {
           options={[
             { value: 'all', label: 'All' },
             { value: 'following', label: 'Following' },
-            { value: 'class', label: 'My class' },
-            { value: 'campus', label: 'Campus' },
           ]}
         />
       )}

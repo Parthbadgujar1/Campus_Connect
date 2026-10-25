@@ -170,7 +170,7 @@ export default function SafetyPage() {
         <section>
           <SectionHeader title="Report a concern" />
           <InfoBanner icon={MessageSquareWarning} title="Harassment, an unsafe spot or a suspicious person?" action={<Link href="/contact?topic=safety" className={buttonClass({ size: 'sm' })}>Report to the college team</Link>}>
-            Your report goes to the college admins. For anything urgent, call 112 first. To report a post, message or profile, use Report on it directly.
+            Your report goes to the CampusConnect admins. For anything urgent, call 112 first. To report a post, message or profile, use Report on it directly.
           </InfoBanner>
         </section>
       </div>

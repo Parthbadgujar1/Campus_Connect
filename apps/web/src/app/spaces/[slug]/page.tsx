@@ -215,7 +215,7 @@ function SpaceInner({ slug }: { slug: string }) {
               {tab === 'about' && (
                 <Card className="space-y-3 p-4">
                   <p className="text-[15px]">{s.description || 'No description yet.'}</p>
-                  <p className="text-[13px] text-text-3">Created {ago(s.createdAt)} · {s.privacy === 'public' ? 'Anyone at the college can read and join' : 'Joining needs an owner’s approval'}</p>
+                  <p className="text-[13px] text-text-3">Created {ago(s.createdAt)} · {s.privacy === 'public' ? 'Anyone on CampusConnect can read and join' : 'Joining needs an owner’s approval'}</p>
                   {s.channels.length > 0 && (
                     <div>
                       <p className="mb-1.5 text-sm font-semibold">Channels</p>

@@ -1,7 +1,7 @@
 # CampusConnect
 
-One app for campus life. People sign up with any email and password, choose their college and
-their role, and see the sections that fit that role after signing in.
+One shared community for everyone: feed, chats, spaces, loops, events and more. Anyone can sign up with an
+email and password and sees everyone else, with no colleges to choose between.
 
 | Role | What they get |
 |---|---|

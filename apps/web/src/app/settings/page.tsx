@@ -74,7 +74,7 @@ export default function SettingsPage() {
         <SectionHeader title="Feedback & surveys" description="Tell the team what works and what does not. Every message is read." />
         <Card className="divide-y divide-border overflow-hidden">
           <ListRow icon={MessageSquareHeart} title="Send feedback about the app" subtitle="Ideas, problems, praise or questions" href="/feedback?tab=send" />
-          <ListRow icon={ClipboardList} title="Surveys" subtitle="Questions from your college" href="/feedback" />
+          <ListRow icon={ClipboardList} title="Surveys" subtitle="Questions from CampusConnect" href="/feedback" />
           <ListRow icon={FileText} title="My feedback" subtitle="What you sent and what happened to it" href="/feedback?tab=mine" />
         </Card>
       </section>

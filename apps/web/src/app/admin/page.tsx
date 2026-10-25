@@ -121,7 +121,7 @@ export default function AdminOverviewPage() {
         </section>
       )}
       {!can(user, 'admin.people') && (
-        <p className="flex items-center gap-2 text-[13px] text-text-3"><Users className="h-4 w-4" aria-hidden="true" /> Numbers cover your whole college.</p>
+        <p className="flex items-center gap-2 text-[13px] text-text-3"><Users className="h-4 w-4" aria-hidden="true" /> Numbers cover everyone on CampusConnect.</p>
       )}
     </div>
   );

@@ -48,7 +48,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
               <div className="rounded-2xl border border-border bg-surface p-6 text-center">
                 <CheckCircle2 className="mx-auto h-10 w-10 text-success" aria-hidden="true" />
                 <p className="mt-2 text-[17px] font-semibold">You have answered this survey</p>
-                <p className="mt-1 text-[14px] text-text-2">Thank you for helping your college.</p>
+                <p className="mt-1 text-[14px] text-text-2">Thank you for your feedback.</p>
                 <Link href="/feedback" className={buttonClass({ variant: 'secondary', className: 'mt-4' })}>
                   Back to Feedback
                 </Link>

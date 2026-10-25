@@ -8,8 +8,7 @@
 //
 // Variables (all optional except the first two):
 //   BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD (10+ characters), BOOTSTRAP_ADMIN_NAME
-//   BOOTSTRAP_COLLEGE_NAME, BOOTSTRAP_COLLEGE_SHORT_NAME, BOOTSTRAP_COLLEGE_SLUG,
-//   BOOTSTRAP_COLLEGE_CITY, BOOTSTRAP_COLLEGE_STATE
+// (CampusConnect is one shared community, so there is no college to name.)
 // Remove BOOTSTRAP_ADMIN_PASSWORD from the environment once you have signed in.
 
 import pino from 'pino';
@@ -49,17 +48,17 @@ async function main() {
     const now = new Date();
     let collegeId = (await db.col('colleges').findOne({}, { projection: { _id: 1 } }))?._id;
     if (!collegeId) {
-      const name = env.BOOTSTRAP_COLLEGE_NAME?.trim() || 'My College';
-      const shortName = env.BOOTSTRAP_COLLEGE_SHORT_NAME?.trim() || name.slice(0, 12);
-      const slug = (env.BOOTSTRAP_COLLEGE_SLUG?.trim() || shortName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'college';
+      const name = 'CampusConnect';
+      const shortName = 'CampusConnect';
+      const slug = 'campusconnect';
       collegeId = uuidv7();
       await db.col('colleges').insertOne({
         _id: collegeId,
         slug,
         name,
         shortName,
-        city: env.BOOTSTRAP_COLLEGE_CITY?.trim() || '',
-        state: env.BOOTSTRAP_COLLEGE_STATE?.trim() || '',
+        city: '',
+        state: '',
         timezone: 'Asia/Kolkata',
         shard: 'default',
         status: 'active',
@@ -68,7 +67,7 @@ async function main() {
         createdAt: now,
         updatedAt: now,
       });
-      console.log(`bootstrap: created college "${name}" (add departments and domains in Admin → Colleges)`);
+      console.log(`bootstrap: created the shared community "${name}"`);
     }
 
     const userId = uuidv7();

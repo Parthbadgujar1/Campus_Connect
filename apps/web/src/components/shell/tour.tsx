@@ -21,7 +21,7 @@ interface Step {
 
 const STEPS: Step[] = [
   { target: null, title: 'Welcome to CampusConnect', body: 'A quick look at where everything lives. It takes about 30 seconds, and you can skip it any time.' },
-  { target: 'tab-home', title: 'Home', body: 'Your feed: posts from your college, your class and people you follow, with notices pinned on top.' },
+  { target: 'tab-home', title: 'Home', body: 'Your feed: posts from everyone and the people you follow, with notices pinned on top.' },
   { target: 'tab-campus', title: 'Campus', body: 'Notices, events, the Shelf for notes and papers, lectures, opportunities, lost & found and the marketplace.' },
   { target: 'tab-discover', title: 'Discover', body: 'Spaces and their discussion boards, Hush for anonymous questions, games and videos.' },
   { target: 'tab-chats', title: 'Chats', body: 'Direct messages and groups, with plans, polls and view-once snaps.' },

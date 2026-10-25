@@ -166,7 +166,7 @@ function NewsInner() {
     <div className="mx-auto w-full max-w-3xl px-4 pb-28 md:px-8 md:pb-12">
       <PageHeader
         title="Notices & news"
-        subtitle="From your college, department and teachers"
+        subtitle="Announcements and updates"
         back
         backHref="/campus"
         actions={
@@ -200,7 +200,7 @@ function NewsInner() {
         <InfiniteList
           state={list}
           className="space-y-3"
-          empty={{ icon: Megaphone, title: 'No notices here', description: 'Official notices from your college show up here.' }}
+          empty={{ icon: Megaphone, title: 'No notices here', description: 'Announcements show up here.' }}
           endMessage="You’re all caught up"
           render={(a) => <NoticeCard a={a} manage={manage} onChange={(next) => list.setItems((items) => (next ? items.map((x) => (x.id === a.id ? next : x)) : items.filter((x) => x.id !== a.id)))} />}
         />

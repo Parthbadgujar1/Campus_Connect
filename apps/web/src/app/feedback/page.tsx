@@ -43,7 +43,7 @@ function SurveysTab() {
   if (list.loading) return <SkeletonList variant="row" count={3} />;
   if (list.error) return <ErrorState error={list.error} onRetry={list.reload} />;
   const items = list.data?.items ?? [];
-  if (!items.length) return <EmptyState icon={ClipboardList} title="No surveys right now" description="When your college asks for your opinion, the survey appears here (and as a notification)." />;
+  if (!items.length) return <EmptyState icon={ClipboardList} title="No surveys right now" description="When we ask for your opinion, the survey appears here (and as a notification)." />;
   const open = items.filter((s) => !s.answered);
   const answered = items.filter((s) => s.answered);
   return (
@@ -146,7 +146,7 @@ function SendTab({ onSent }: { onSent: () => void }) {
         {send.pending ? 'Sending…' : 'Send feedback'}
       </Button>
       <p className="flex items-center justify-center gap-1.5 text-center text-[12px] text-text-3">
-        <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Only the college admins read feedback. You will be told when its status changes.
+        <Lock className="h-3.5 w-3.5" aria-hidden="true" /> Only the admins read feedback. You will be told when its status changes.
       </p>
     </form>
   );
@@ -184,7 +184,7 @@ function FeedbackInner() {
   const [tab, setTab] = useState<Tab>((params.get('tab') as Tab) || 'surveys');
   return (
     <div className="mx-auto w-full max-w-3xl px-4 pb-28 md:px-8 md:pb-12">
-      <PageHeader title="Feedback" subtitle="Surveys from your college, and your ideas for the app" back backHref="/campus" />
+      <PageHeader title="Feedback" subtitle="Surveys, and your ideas for the app" back backHref="/campus" />
       <Reveal className="mt-4">
         <Segmented<Tab>
           label="Feedback sections"

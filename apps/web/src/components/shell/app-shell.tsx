@@ -167,7 +167,7 @@ function PendingRoleBanner() {
   return (
     <div role="status" className="font-sans flex items-center justify-center gap-2 bg-info-soft px-4 py-2.5 text-center text-[14px] font-medium text-info">
       <Hourglass className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <span>Your {user.pendingRole === 'faculty' ? 'faculty' : 'expert'} access is being reviewed by your college. You can use CampusConnect as a student until then.</span>
+      <span>Your {user.pendingRole === 'faculty' ? 'faculty' : 'expert'} access is being reviewed by the admins. You can use CampusConnect as a student until then.</span>
     </div>
   );
 }

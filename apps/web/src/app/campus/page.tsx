@@ -177,7 +177,7 @@ export default function CampusPage() {
             <ClipboardCheck className="h-6 w-6 shrink-0" aria-hidden="true" />
             <span className="min-w-0 flex-1">
               <span className="block font-semibold">{optional[0]!.title}</span>
-              <span className="block text-[13px] opacity-80">A short survey from your college{optional.length > 1 ? ` · ${optional.length - 1} more waiting` : ''}</span>
+              <span className="block text-[13px] opacity-80">A short survey from CampusConnect{optional.length > 1 ? ` · ${optional.length - 1} more waiting` : ''}</span>
             </span>
             <span className="shrink-0 text-[14px] font-semibold">Answer</span>
           </Link>

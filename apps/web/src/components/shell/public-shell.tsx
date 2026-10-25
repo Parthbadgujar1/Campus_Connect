@@ -121,7 +121,7 @@ export function PublicFooter() {
       <div className="mx-auto grid max-w-5xl gap-8 px-4 py-10 text-[14px] sm:grid-cols-3">
         <div>
           <p className="font-semibold text-text">CampusConnect</p>
-          <p className="mt-2 text-text-3">One calm app for your college: friends, spaces, events, learning and campus life.</p>
+          <p className="mt-2 text-text-3">One app for everything: friends, chats, spaces, loops, events and more.</p>
         </div>
         <nav aria-label="Legal" className="grid content-start gap-2">
           <Link href="/privacy" className="text-text-2 hover:text-text">Privacy policy</Link>

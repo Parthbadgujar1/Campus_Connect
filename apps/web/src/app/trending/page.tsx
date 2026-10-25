@@ -7,7 +7,7 @@ import { PostStream } from '@/components/feed/post-stream';
 export default function TrendingPage() {
   return (
     <div className="mx-auto w-full max-w-2xl px-4 pb-28 md:px-8 md:pb-12">
-      <PageHeader title="Trending" subtitle="The most liked posts at your college this week" back backHref="/discover" />
+      <PageHeader title="Trending" subtitle="The most liked posts this week" back backHref="/discover" />
       <PostStream
         cacheKey="trending"
         query={{ scope: 'trending' }}

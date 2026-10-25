@@ -741,6 +741,8 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
   });
   app.post('/colleges', { schema: { tags: ['admin'], summary: 'Add a college', body: collegeBody } }, async (request, reply) => {
     const auth = requireRole(request, 'admin');
+    // CampusConnect is one shared community, so there is nothing to split people into.
+    throw Errors.conflict('CampusConnect is a single shared community, so more colleges cannot be added.');
     const b = request.body;
     const slugBase = b.shortName.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'college';
     let slug = slugBase.length >= 2 ? slugBase : `${slugBase}-college`;

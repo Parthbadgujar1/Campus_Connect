@@ -3,6 +3,7 @@ import { loadEnvFile, parseConfig } from './config/env.js';
 import { createLogger } from './core/logger.js';
 import { closeDeps, createDeps } from './deps.js';
 import { applySchema, schemaIsCurrent } from './infra/db/migrate.js';
+import { ensureSharedCommunity } from './infra/db/platform.js';
 import { registerJobs } from './jobs/index.js';
 
 // Process entry point: configuration -> dependencies -> app -> listen, plus graceful shutdown.
@@ -44,6 +45,13 @@ async function main() {
     } catch (err) {
       logger.warn({ err: (err as Error).message }, 'could not activate pending accounts');
     }
+  }
+
+  // One shared community: everyone sees everyone (see platform.ts).
+  try {
+    await ensureSharedCommunity(deps.db, logger);
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'could not merge colleges into the shared community');
   }
 
   // Spaces go live as soon as they are created now, so release any that were waiting for approval.

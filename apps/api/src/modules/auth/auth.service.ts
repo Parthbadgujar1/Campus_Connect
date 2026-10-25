@@ -105,18 +105,29 @@ export class AuthService {
     return { userId: row.userId, email: row.email };
   }
 
-  private async resolveCollege(collegeId: string | undefined, email: string) {
+  /** Everyone joins the one shared community; it is created by the first sign-up if it does not exist yet. */
+  private async resolveCollege() {
     const colleges = this.deps.db.col('colleges');
-    if (collegeId) {
-      const chosen = await colleges.findOne({ _id: collegeId, status: 'active' });
-      if (!chosen) throw Errors.validation([{ field: 'collegeId', message: 'Choose your college from the list.' }]);
-      return chosen;
-    }
-    const byDomain = await colleges.findOne({ 'domains.domain': domainOf(email), status: 'active' });
-    if (byDomain) return byDomain;
-    const active = await colleges.find({ status: 'active' }).limit(2).toArray();
-    if (active.length === 1) return active[0]!;
-    throw Errors.validation([{ field: 'collegeId', message: 'Choose your college from the list.' }]);
+    const existing = await colleges.find({ status: 'active' }).sort({ createdAt: 1 }).limit(1).next();
+    if (existing) return existing;
+    const now = new Date();
+    const college = {
+      _id: uuidv7(),
+      slug: 'campusconnect',
+      name: 'CampusConnect',
+      shortName: 'CampusConnect',
+      city: '',
+      state: '',
+      timezone: 'Asia/Kolkata',
+      shard: 'default',
+      status: 'active' as const,
+      domains: [],
+      settings: { academicYear: `${now.getFullYear()}-${String(now.getFullYear() + 1).slice(2)}`, currentSemester: 'odd' as const, divisions: ['A', 'B', 'C'] },
+      createdAt: now,
+      updatedAt: now,
+    };
+    await colleges.insertOne(college);
+    return college;
   }
 
   async register(
@@ -148,7 +159,7 @@ export class AuthService {
     // Any email address works (Gmail, Outlook, a college address...). Students and faculty choose
     // their college on the form; industry experts are not from a college, so they join the main
     // one. Roles are not inferred from the address: faculty and expert access is reviewed.
-    const college = await this.resolveCollege(input.collegeId, input.email);
+    const college = await this.resolveCollege();
 
     const problems = passwordProblems(input.password, { email: input.email, name: input.displayName });
     if (problems.length) throw Errors.weakPassword(problems);

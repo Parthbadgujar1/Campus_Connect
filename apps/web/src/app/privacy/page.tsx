@@ -37,7 +37,7 @@ export default function PrivacyPolicyPage() {
           body: (
             <>
               <ul className="list-disc space-y-1.5 pl-6">
-                <li><strong className="text-text">Account:</strong> your name, email address, your college and the role details you give at sign-up (enrolment or employee number, designation, organisation), and a scrambled form of your password (we never see or store the password itself).</li>
+                <li><strong className="text-text">Account:</strong> your name, email address and the role details you give at sign-up (enrolment or employee number, designation, organisation), and a scrambled form of your password (we never see or store the password itself).</li>
                 <li><strong className="text-text">Profile (optional):</strong> photo, headline, bio, department, year, semester, division, skills, interests and links, only if you add them.</li>
                 <li><strong className="text-text">What you share:</strong> posts, comments, messages, files, events, listings and other content you create.</li>
                 <li><strong className="text-text">Settings:</strong> theme, font, notification choices, and your cookie and consent choices.</li>
@@ -52,7 +52,7 @@ export default function PrivacyPolicyPage() {
           title: 'Why we use it',
           body: (
             <ul className="list-disc space-y-1.5 pl-6">
-              <li>To run your account and show you your college’s content (the service you asked for).</li>
+              <li>To run your account and show you the content on CampusConnect (the service you asked for).</li>
               <li>To keep everyone safe: preventing spam, fraud and abuse, and handling reports.</li>
               <li>To send emails you need (verification, password resets, security alerts) and, only if you opt in, summaries and product news.</li>
               <li>To meet legal duties, such as responding to lawful requests.</li>
@@ -74,7 +74,7 @@ export default function PrivacyPolicyPage() {
           title: 'Who can see your information',
           body: (
             <>
-              <p>CampusConnect is for your college only: people from other colleges cannot see your profile or posts. You choose each post’s audience (whole campus, department, year, division or a space), and in <Link href="/settings/privacy" className="text-accent hover:underline">privacy controls</Link> you choose who can see your profile details and who can message you.</p>
+              <p>Your profile and posts can be seen by other people on CampusConnect. You can post to everyone or to a space, and in <Link href="/settings/privacy" className="text-accent hover:underline">privacy controls</Link> you choose who can see your profile details and who can message you.</p>
               <p>Blocking someone hides you from each other everywhere.</p>
             </>
           ),
