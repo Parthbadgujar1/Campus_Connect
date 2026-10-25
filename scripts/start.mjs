@@ -39,7 +39,7 @@ env.MONGODB_DB ??= 'campus_connect';
 const domain = env.RAILWAY_PUBLIC_DOMAIN || env.RAILWAY_STATIC_URL;
 const base = (env.PUBLIC_URL || (domain ? `https://${domain}` : `http://localhost:${PORT}`)).replace(/\/$/, '');
 if (!env.PUBLIC_URL && !domain) {
-  log('No public domain yet. In Railway open Settings → Networking → Generate Domain, then redeploy; sign-in needs https.');
+  log('No public domain yet. The app is running, but sign-in needs one: in Railway open Settings → Networking → Generate Domain (the service redeploys by itself).');
 }
 env.WEB_URL ??= base;
 env.WEB_ORIGINS ??= base;
@@ -47,7 +47,9 @@ env.PUBLIC_API_URL ??= base; // the API is served from the same address, under /
 
 env.NODE_ENV = 'production';
 env.TRUST_PROXY ??= 'true';
-env.COOKIE_SECURE ??= base.startsWith('https://') ? 'true' : 'false';
+// The API refuses to run in production without secure cookies, and hosts like Railway always serve
+// over https at the edge, so this stays on even before a domain exists.
+env.COOKIE_SECURE ??= 'true';
 env.LOG_PRETTY ??= 'false';
 env.ENABLE_API_DOCS ??= 'false';
 
