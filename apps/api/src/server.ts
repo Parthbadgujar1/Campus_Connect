@@ -29,6 +29,23 @@ async function main() {
     logger.warn({ err: (err as Error).message }, 'could not check the database schema (database unreachable?)');
   }
 
+  // Email confirmation is off, so accounts an earlier sign-up left waiting for it can never be
+  // confirmed: activate them as students (they could not sign in or appear in people lists), and close
+  // any faculty/expert requests, since sign-up is student-only for now.
+  if (!config.requireEmailVerification) {
+    try {
+      const now = new Date();
+      const activated = await deps.db.col('users').updateMany({ status: 'pending' }, { $set: { status: 'active', pendingRole: null, updatedAt: now } });
+      await deps.db.col('verification_requests').updateMany(
+        { status: 'pending', kind: { $in: ['faculty_role', 'expert_role'] } },
+        { $set: { status: 'rejected', reviewerNote: 'Sign-up is student-only for now.', reviewedAt: now, updatedAt: now } },
+      );
+      if (activated.modifiedCount) logger.info({ count: activated.modifiedCount }, 'activated accounts that were waiting for email confirmation');
+    } catch (err) {
+      logger.warn({ err: (err as Error).message }, 'could not activate pending accounts');
+    }
+  }
+
   const app = await buildApp(deps);
   if (config.jobsEnabled) {
     registerJobs(deps);

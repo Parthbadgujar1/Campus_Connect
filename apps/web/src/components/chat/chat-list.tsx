@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { BellOff, Check, Hash, MessageSquarePlus, MessagesSquare, Pin, Search, Users, UsersRound, VenetianMask } from 'lucide-react';
 import { get, post } from '@/lib/api/client';
-import { invalidate, useAction, useInfinite, useQuery, type Page } from '@/lib/api/hooks';
+import { invalidate, useAction, useInfinite, type Page } from '@/lib/api/hooks';
 import type { ChatListItem, PersonSummary } from '@/lib/api/types';
 import { Button } from '@/components/ui/button';
 import { Chip, ChipRow } from '@/components/ui/chip';
@@ -40,7 +40,8 @@ function NewChat({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [group, setGroup] = useState(false);
   const [picked, setPicked] = useState<PersonRow[]>([]);
   const [title, setTitle] = useState('');
-  const people = useQuery<Page<PersonRow>>(open ? `chats:people:${q}` : null, (signal) => get('/users', { q: q || undefined, limit: 20 }, signal));
+  // Everyone at the college, a page at a time, so any person in the portal can be messaged.
+  const people = useInfinite<PersonRow>(open ? `chats:people:${q}` : null, (cursor, signal) => get<Page<PersonRow>>('/users', { q: q || undefined, cursor: cursor ?? undefined, limit: 30 }, signal));
   const direct = useAction(async (userId: string) => {
     const r = await post<{ chatId: string }>('/chats/direct', { userId });
     onClose();
@@ -76,7 +77,7 @@ function NewChat({ open, onClose }: { open: boolean; onClose: () => void }) {
         {people.loading && <SkeletonList variant="row" count={4} />}
         {people.error && <ErrorState error={people.error} onRetry={people.reload} compact />}
         <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border">
-          {people.data?.items.map((p) => {
+          {people.items.map((p) => {
             const on = picked.some((x) => x.id === p.id);
             return (
               <li key={p.id}>
@@ -92,6 +93,8 @@ function NewChat({ open, onClose }: { open: boolean; onClose: () => void }) {
             );
           })}
         </ul>
+        {!people.loading && !people.error && !people.items.length && <p className="rounded-2xl border border-dashed border-border p-5 text-center text-[14px] text-text-3">{q ? 'No one matches that search.' : 'No one else has joined yet.'}</p>}
+        <LoadMore hasMore={people.hasMore} loading={people.loadingMore} onClick={people.loadMore} label="Show more people" />
         {(direct.error || makeGroup.error) && <FormAlert>{(direct.error ?? makeGroup.error)!.message}</FormAlert>}
       </div>
     </Sheet>
