@@ -1,15 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Building2, Pause, Pencil, Play, Plus } from 'lucide-react';
-import { errorMessage, get, patch, post } from '@/lib/api/client';
+import { Building2, Pause, Pencil, Play, Plus, Trash2 } from 'lucide-react';
+import { del, errorMessage, get, patch, post } from '@/lib/api/client';
 import { invalidate, useAction, useQuery } from '@/lib/api/hooks';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Field, Input, Textarea } from '@/components/ui/fields';
 import { Card, EmptyState } from '@/components/ui/layout';
 import { Sheet } from '@/components/ui/sheet';
-import { ErrorState, FormAlert, SkeletonList, Spinner } from '@/components/ui/states';
+import { ConfirmDialog, ErrorState, FormAlert, SkeletonList, Spinner } from '@/components/ui/states';
 import { useToast } from '@/components/ui/toast';
 import { useSession } from '@/lib/session';
 import { day } from '@/lib/live-time';
@@ -85,6 +85,14 @@ export default function AdminCollegesPage() {
   const list = useQuery<{ items: CollegeRow[] }>('admin:colleges', (signal) => get('/admin/colleges', undefined, signal));
   const [editing, setEditing] = useState<CollegeRow | 'new' | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<CollegeRow | null>(null);
+  const remove = useAction(async () => {
+    if (!deleting) return;
+    await del(`/admin/colleges/${deleting.id}`);
+    invalidate('admin:colleges', 'meta:colleges');
+    toast(`${deleting.shortName} was deleted`);
+    setDeleting(null);
+  });
   const toggle = async (c: CollegeRow) => {
     setBusy(c.id);
     try {
@@ -126,10 +134,27 @@ export default function AdminCollegesPage() {
                   {c.status === 'active' ? 'Pause sign-ups' : 'Open sign-ups'}
                 </Button>
               )}
+              {c.id !== user?.college.id && (
+                <Button size="sm" variant="ghost" className="text-danger" disabled={c.people > 0} title={c.people > 0 ? 'A college with people cannot be deleted. Pause sign-ups instead.' : undefined} onClick={() => setDeleting(c)}>
+                  <Trash2 className="h-4 w-4" aria-hidden="true" /> Delete
+                </Button>
+              )}
             </div>
           </Card>
         ))}
       </div>
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => void remove.run()}
+        title={`Delete ${deleting?.shortName ?? 'this college'}?`}
+        description={`This permanently deletes ${deleting?.name ?? 'the college'} and its ${deleting?.departments ?? 0} departments. It cannot be undone.`}
+        confirmLabel="Delete college"
+        danger
+        requireText={deleting?.shortName}
+        pending={remove.pending}
+        error={remove.error?.message}
+      />
       {editing && <CollegeSheet college={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </div>
   );

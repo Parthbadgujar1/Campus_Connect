@@ -791,6 +791,29 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
     },
   );
 
+  // Deleting is limited to colleges nobody belongs to (extra or test colleges). A college with people
+  // can be paused instead, which hides it from new sign-ups without touching anyone's account.
+  app.delete('/colleges/:id', { schema: { tags: ['admin'], summary: 'Delete a college that has no people', params: idParam } }, async (request) => {
+    const auth = requireRole(request, 'admin');
+    const id = request.params.id;
+    if (id === auth.collegeId) throw Errors.badRequest('You cannot delete your own college.');
+    const college = await db.col('colleges').findOne({ _id: id }, { projection: { name: 1 } });
+    if (!college) throw Errors.notFound('This college');
+    const people = await users().countDocuments({ collegeId: id, status: { $ne: 'deleted' } });
+    if (people) throw Errors.conflict(`This college still has ${people} ${people === 1 ? 'person' : 'people'}. Pause it instead, which hides it from new sign-ups.`);
+
+    // Remove what belongs to the college: departments, subjects, anything else carrying its id.
+    // Audit records and uploaded files are kept (the deletion itself is audited below).
+    const keep = new Set(['colleges', 'audit_logs', 'files']);
+    const names = (await db.db.listCollections({}, { nameOnly: true }).toArray()).map((c) => c.name).filter((n) => !n.startsWith('system.') && !keep.has(n));
+    let removed = 0;
+    for (const name of names) removed += (await db.raw(name).deleteMany({ collegeId: id })).deletedCount;
+    await db.col('colleges').deleteOne({ _id: id });
+    await audit(db, { action: 'admin.college_delete', actorId: auth.userId, actorRole: auth.role, collegeId: auth.collegeId, entityType: 'college', entityId: id, requestId: request.id, meta: { name: college.name, removedRecords: removed } });
+    await app.deps.cache.del('meta:colleges');
+    return { status: 'deleted' };
+  });
+
   // Keeps the role list in one place for the web's admin screens.
   app.get('/roles', { schema: { tags: ['admin'], summary: 'Roles and what each can see' } }, async (request) => {
     requireRole(request, ...STAFF_ROLES);
