@@ -8,7 +8,7 @@ import type { RoleInfo, User } from '../../infra/db/models.js';
 import { defaultNotificationPrefs, defaultProfile, defaultSettings } from '../users/defaults.js';
 import { loadMe } from '../users/me.js';
 import { hashPassword, passwordProblems, verifyPassword } from './password.js';
-import type { SessionService } from './session.service.js';
+import type { CreatedSession, SessionService } from './session.service.js';
 
 // Account lifecycle: sign-up (per role), email verification, sign-in, sign-out, password
 // reset/change.
@@ -136,7 +136,7 @@ export class AuthService {
       collegeId?: string;
     },
     meta: RequestMeta,
-  ): Promise<{ verifyUrl: string } | void> {
+  ): Promise<{ userId: string; verifyUrl?: string; session?: CreatedSession } | void> {
     if (!input.acceptTerms) throw Errors.validation([{ field: 'acceptTerms', message: 'Please accept the terms and privacy policy.' }]);
 
     // The age is worked out from the date of birth: CampusConnect is for people aged 18 or over.
@@ -148,7 +148,7 @@ export class AuthService {
     // Any email address works (Gmail, Outlook, a college address...). Students and faculty choose
     // their college on the form; industry experts are not from a college, so they join the main
     // one. Roles are not inferred from the address: faculty and expert access is reviewed.
-    const college = input.role === 'expert' ? await this.mainCollege() : await this.resolveCollege(input.collegeId, input.email);
+    const college = await this.resolveCollege(input.collegeId, input.email);
 
     const problems = passwordProblems(input.password, { email: input.email, name: input.displayName });
     if (problems.length) throw Errors.weakPassword(problems);
@@ -157,6 +157,8 @@ export class AuthService {
     const passwordHash = await hashPassword(input.password);
     const existing = await this.users.findOne({ email: input.email }, { projection: { status: 1 } });
     if (existing) {
+      // Signing in right after sign-up cannot hide whether an address is taken, so say so plainly.
+      if (!this.deps.config.requireEmailVerification) throw Errors.validation([{ field: 'email', message: 'An account with this email already exists. Sign in instead.' }]);
       // Same answer as a new sign-up; the owner gets an email instead (no enumeration).
       if (existing.status === 'pending') await this.resendVerification(input.email, meta);
       else if (existing.status === 'active') {
@@ -168,8 +170,8 @@ export class AuthService {
     const now = new Date();
     const userId = uuidv7();
     const username = await this.uniqueUsername(input.email);
-    // Faculty and expert accounts need an admin's approval before they can sign in at all.
-    const pendingRole = input.role === 'student' ? null : input.role;
+    // Everyone who signs up is a student. Admins come from the bootstrap script or another admin.
+    const verify = this.deps.config.requireEmailVerification;
     const user: User = {
       _id: userId,
       collegeId: college._id,
@@ -177,8 +179,8 @@ export class AuthService {
       emailVerifiedAt: null,
       passwordHash,
       role: 'student',
-      pendingRole,
-      status: 'pending',
+      pendingRole: null,
+      status: verify ? 'pending' : 'active',
       roleInfo: {},
       phone: input.phone,
       dateOfBirth: dob,
@@ -214,33 +216,19 @@ export class AuthService {
         })),
         { session },
       );
-      if (pendingRole) {
-        await this.deps.db.col('verification_requests').insertOne(
-          { _id: uuidv7(), collegeId: college._id, userId, kind: pendingRole === 'faculty' ? 'faculty_role' : 'expert_role', status: 'pending', fileId: null, note: null, reviewerId: null, reviewerNote: null, reviewedAt: null, createdAt: now, updatedAt: now },
-          { session },
-        );
+      await audit(this.deps.db, { action: 'auth.register', actorId: userId, collegeId: college._id, entityType: 'user', entityId: userId, ipHash: meta.ipHash, requestId: meta.requestId, meta: { role: 'student' } }, session);
+
+      if (!verify) {
+        // No email step for now: the account is active and the person is signed in straight away.
+        const created = await this.sessions.create({ userId, role: 'student', kind: 'web', rememberMe: true, ipHash: meta.ipHash, userAgent: meta.userAgent }, session);
+        return { userId, session: created };
       }
       const token = await this.issueEmailToken({ userId, email: input.email, purpose: 'verify_email', ttlMinutes: VERIFY_TTL_HOURS * 60, ipHash: meta.ipHash }, session);
       const url = `${this.deps.config.webUrl}/verify-email?token=${token}`;
       await this.deps.mailer.enqueue({ to: input.email, template: 'verify_email', userId, payload: { name: input.displayName.split(' ')[0], url } }, session);
-      await audit(this.deps.db, { action: 'auth.register', actorId: userId, collegeId: college._id, entityType: 'user', entityId: userId, ipHash: meta.ipHash, requestId: meta.requestId, meta: { role: input.role } }, session);
-      return { verifyUrl: url };
+      return { userId, verifyUrl: url };
     });
-    // Let the college's admins know a faculty or expert sign-up is waiting for them.
-    if (pendingRole) {
-      const admins = await this.users.find({ collegeId: college._id, role: 'admin', status: 'active' }, { projection: { _id: 1 } }).limit(50).toArray();
-      await this.deps.notifier
-        .send(admins.map((a) => ({ userId: a._id, kind: 'verification' as const, title: `${input.displayName} signed up as ${pendingRole === 'faculty' ? 'faculty' : 'an industry expert'}`, body: 'Approve or reject the sign-up in the admin console.', link: '/admin/people?tab=requests', actorId: userId, entityType: 'user', entityId: userId })))
-        .catch(() => undefined);
-    }
     return result;
-  }
-
-  /** The college industry experts join: the oldest active one. */
-  private async mainCollege() {
-    const c = await this.deps.db.col('colleges').find({ status: 'active' }).sort({ createdAt: 1 }).limit(1).next();
-    if (!c) throw Errors.validation([{ field: 'collegeId', message: 'No college is set up yet.' }]);
-    return c;
   }
 
   async resendVerification(email: string, meta: RequestMeta): Promise<void> {

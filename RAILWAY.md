@@ -36,7 +36,8 @@ the API and web app find each other inside the container.
 
 | What | How |
 |---|---|
-| **Send real email** (sign-up verification, password reset) | Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `MAIL_FROM` from any email provider. Until then, emails are kept in **Admin → System → Email**. |
+| **Send real email** (password reset, notifications) | Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `MAIL_FROM` from any email provider. Until then, emails are kept in **Admin → System → Email**. |
+| **Require email confirmation** | Set `REQUIRE_EMAIL_VERIFICATION=true` (needs SMTP above). By default, sign-up signs people in straight away and everyone joins as a student. |
 | **Keep uploaded files** | Add a **Volume** to the service (any mount path); it is used automatically. Or set `STORAGE_DRIVER=s3` with `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`. Without either, uploads are lost when the service redeploys. |
 | **Your own secrets** | Set `APP_SECRET` (any long random value) to derive the secrets from it instead of the database URL, or set `SESSION_SECRET`, `FILE_SIGNING_SECRET` and `IP_HASH_SECRET` individually. |
 | **Legal page details** | `OPERATOR_NAME`, `OPERATOR_ADDRESS`, `SUPPORT_EMAIL`, `PRIVACY_EMAIL`. |

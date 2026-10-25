@@ -1,24 +1,22 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { Briefcase, ExternalLink, GraduationCap, Hourglass, MailCheck, Presentation } from 'lucide-react';
+import { ExternalLink, MailCheck } from 'lucide-react';
 import { AuthLayout, Checkbox, FormField } from '@/components/auth/auth-layout';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/fields';
 import { PasswordHints, PasswordInput } from '@/components/ui/password-input';
 import { FormAlert, Spinner } from '@/components/ui/states';
-import { motion } from '@/components/motion';
 import { get, isApiError, post } from '@/lib/api/client';
 import { useQuery } from '@/lib/api/hooks';
 import { usePublicConfig } from '@/components/shell/public-shell';
-import { cn } from '@/lib/utils';
+import type { SessionPayload } from '@/lib/api/types';
+import { useSession } from '@/lib/session';
 
 // Sign up like any app: name, email, mobile, date of birth and a password. The age is worked out
-// from the date of birth (18 or over). Students and faculty choose their college at the end;
-// industry experts don't. Faculty and experts can sign in once an admin approves them.
-
-type Role = 'student' | 'faculty' | 'expert';
+// from the date of birth (18 or over). Everyone joins as a student and is signed in straight away.
 
 interface College {
   id: string;
@@ -26,12 +24,6 @@ interface College {
   shortName: string;
   city: string | null;
 }
-
-const ROLES: Array<{ value: Role; label: string; hint: string; icon: typeof GraduationCap }> = [
-  { value: 'student', label: 'Student', hint: 'Studying at a college', icon: GraduationCap },
-  { value: 'faculty', label: 'Faculty', hint: 'Teaching or staff', icon: Presentation },
-  { value: 'expert', label: 'Industry expert', hint: 'Alumni or mentor', icon: Briefcase },
-];
 
 const MINIMUM_AGE = 18;
 
@@ -48,8 +40,9 @@ function ageFrom(dob: string): number | null {
 
 export default function RegisterPage() {
   const config = usePublicConfig();
+  const router = useRouter();
+  const { adopt } = useSession();
   const colleges = useQuery<{ items: College[] }>('meta:colleges', (signal) => get('/meta/colleges', undefined, signal));
-  const [role, setRole] = useState<Role>('student');
   const [collegeId, setCollegeId] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -66,7 +59,6 @@ export default function RegisterPage() {
   const [devLink, setDevLink] = useState<string | null>(null);
   const [resent, setResent] = useState(false);
   const age = useMemo(() => ageFrom(dob), [dob]);
-  const needsCollege = role !== 'expert';
   const today = new Date().toISOString().slice(0, 10);
 
   // With a single college on this server, it is chosen for you.
@@ -84,7 +76,7 @@ export default function RegisterPage() {
     else if (age < MINIMUM_AGE) e.dateOfBirth = `CampusConnect is for people aged ${MINIMUM_AGE} or over.`;
     if (password.length < 10) e.password = 'Use at least 10 characters.';
     if (confirm !== password) e.confirm = 'The two passwords do not match.';
-    if (needsCollege && !collegeId) e.collegeId = 'Choose your college.';
+    if (!collegeId) e.collegeId = 'Choose your college.';
     if (!terms) e.acceptTerms = 'Please accept the terms and privacy policy to continue.';
     return e;
   };
@@ -102,17 +94,23 @@ export default function RegisterPage() {
     }
     setPending(true);
     try {
-      const r = await post<{ devLink?: string }>('/auth/register', {
+      const r = await post<(Partial<SessionPayload> & { devLink?: string }) | undefined>('/auth/register', {
         email: email.trim(),
         password,
         displayName: name.trim(),
-        role,
         phone: phone.trim(),
         dateOfBirth: dob,
-        collegeId: needsCollege ? collegeId : undefined,
+        collegeId,
         acceptTerms: terms,
         marketingOptIn: marketing,
       });
+      // The account is active and the server has already signed the person in.
+      if (r?.user) {
+        await adopt(r as SessionPayload);
+        router.replace('/welcome');
+        return;
+      }
+      // Email confirmation switched on: ask them to check their inbox.
       setDevLink(r?.devLink ?? null);
       setDone(true);
     } catch (err) {
@@ -138,12 +136,6 @@ export default function RegisterPage() {
             <div className="space-y-2 rounded-2xl border border-dashed border-warning bg-warning-soft p-4 text-warning">
               <p className="font-sans text-[13px] font-semibold">Local development: emails are not sent yet, so here is the link.</p>
               <a href={devLink} className="font-sans inline-flex items-center gap-1.5 text-[14px] font-semibold underline"><ExternalLink className="h-4 w-4" aria-hidden="true" /> Confirm my email</a>
-            </div>
-          )}
-          {role !== 'student' && (
-            <div className="flex items-start gap-3 rounded-2xl bg-info-soft p-4 text-info">
-              <Hourglass className="h-5 w-5 shrink-0" aria-hidden="true" />
-              <p className="font-sans text-[14px]">{role === 'faculty' ? 'Faculty accounts are approved by your college admin.' : 'Industry expert accounts are approved by an admin.'} You can sign in as soon as it is approved, and we will email you.</p>
             </div>
           )}
           {resent && <FormAlert tone="success">Sent again. It can take a minute to arrive.</FormAlert>}
@@ -192,28 +184,6 @@ export default function RegisterPage() {
       <form onSubmit={submit} noValidate className="space-y-4">
         {formError && <FormAlert>{formError}</FormAlert>}
 
-        <fieldset>
-          <legend className="font-sans mb-2 text-sm font-semibold">I am joining as</legend>
-          <div role="radiogroup" aria-label="I am joining as" className="grid grid-cols-3 gap-2">
-            {ROLES.map((r) => (
-              <motion.button
-                key={r.value}
-                type="button"
-                role="radio"
-                aria-checked={role === r.value}
-                whileTap={{ scale: 0.96 }}
-                onClick={() => setRole(r.value)}
-                className={cn('font-sans flex flex-col items-center gap-1 rounded-2xl border px-2 py-3 text-center transition-colors', role === r.value ? 'border-accent bg-accent-soft text-accent-soft-ink' : 'border-border bg-surface text-text-2 hover:bg-surface-2')}
-              >
-                <r.icon className="h-5 w-5" aria-hidden="true" />
-                <span className="text-[13px] font-semibold leading-tight">{r.label}</span>
-                <span className="hidden text-[11px] leading-tight text-text-3 sm:block">{r.hint}</span>
-              </motion.button>
-            ))}
-          </div>
-          {role !== 'student' && <p className="font-sans mt-2 text-[12px] text-text-3">{role === 'faculty' ? 'Faculty' : 'Industry expert'} accounts are approved by an admin before you can sign in.</p>}
-        </fieldset>
-
         <FormField id="name" label="Full name" error={err('displayName')}>
           <Input id="name" autoComplete="name" required value={name} onChange={(e) => setName(e.target.value)} aria-invalid={Boolean(err('displayName')) || undefined} />
         </FormField>
@@ -240,7 +210,7 @@ export default function RegisterPage() {
           <PasswordInput id="confirm" autoComplete="new-password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} invalid={Boolean(err('confirm'))} />
         </FormField>
 
-        {needsCollege && (
+        {collegeList.length !== 1 && (
           <FormField id="collegeId" label="Your college" error={err('collegeId')}>
             <Select id="collegeId" value={collegeId} onChange={(e) => setCollegeId(e.target.value)} disabled={colleges.loading} aria-invalid={Boolean(err('collegeId')) || undefined}>
               <option value="">{colleges.loading ? 'Loading colleges…' : 'Choose your college'}</option>

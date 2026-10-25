@@ -95,6 +95,10 @@ const schema = z.object({
   SUPPORT_EMAIL: z.string().default('support@campusconnect.local'),
   PRIVACY_EMAIL: z.string().default('privacy@campusconnect.local'),
 
+  // When false (the default for now), sign-up creates an active account and signs the person in at
+  // once. Set true to require confirming the email address first (needs working email delivery).
+  REQUIRE_EMAIL_VERIFICATION: bool(false),
+
   JOBS_ENABLED: bool(true),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(10).default(300),
   ENABLE_API_DOCS: bool(true),
@@ -188,6 +192,7 @@ export function parseConfig(source: NodeJS.ProcessEnv = process.env) {
       supportEmail: env.SUPPORT_EMAIL,
       privacyEmail: env.PRIVACY_EMAIL,
     },
+    requireEmailVerification: env.REQUIRE_EMAIL_VERIFICATION,
     jobsEnabled: env.JOBS_ENABLED,
     rateLimitPerMinute: env.RATE_LIMIT_PER_MINUTE,
     enableApiDocs: env.ENABLE_API_DOCS,

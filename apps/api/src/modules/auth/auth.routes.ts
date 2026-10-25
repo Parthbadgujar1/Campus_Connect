@@ -82,7 +82,9 @@ export const authRoutes: FastifyPluginAsync = async (base) => {
     async (request, reply) => {
       // Sign-ups have their own switch so they can be paused without blocking sign-ins.
       if (!(await app.deps.flags.isEnabled('module.registration'))) throw Errors.featureDisabled('module.registration');
-      const result = await service.register(request.body, meta(request));
+      // Sign-up is for students only; any role sent by an older client is ignored.
+      const result = await service.register({ ...request.body, role: 'student' }, meta(request));
+      if (result?.session) return reply.status(201).send(await deliver(request, reply, result.userId, result.session));
       // Local development without a mail server: show the confirmation link right away, since
       // emails only land in Admin → System → Email. Never in production.
       const devLink = app.deps.mailer.mode === 'dev' && !app.deps.config.isProd ? (result?.verifyUrl ?? null) : null;
