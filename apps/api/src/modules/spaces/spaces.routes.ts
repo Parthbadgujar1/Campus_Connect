@@ -121,7 +121,7 @@ export const spaceRoutes: FastifyPluginAsync = async (base) => {
       config: { rateLimit: { max: 5, timeWindow: '1 day' } },
       schema: {
         tags: ['spaces'],
-        summary: 'Create a space (listed after approval)',
+        summary: 'Create a space (live at once)',
         body: z.object({
           name: text(2, 80),
           slug: z.string().trim().toLowerCase().regex(/^[a-z0-9-]{2,48}$/).optional(),
@@ -143,12 +143,12 @@ export const spaceRoutes: FastifyPluginAsync = async (base) => {
         if (b.slug) throw Errors.validation([{ field: 'slug', message: 'That address is taken.' }]);
         slug = `${slug.slice(0, 40)}-${Math.floor(100 + Math.random() * 900)}`;
       }
-      const status = isStaff(auth) ? 'active' : 'pending';
+      // Anyone can start a space and it is live at once (class and department spaces stay staff-only).
       const now = new Date();
       const id = uuidv7();
       await db.tx(async (session) => {
         await spaces().insertOne(
-          { _id: id, collegeId: auth.collegeId, slug, name: cleanText(b.name), kind: b.kind, privacy: b.privacy, description: cleanText(b.description ?? ''), tags: b.tags, avatarFileId: null, membersCount: 1, status, createdBy: auth.userId, createdAt: now, updatedAt: now },
+          { _id: id, collegeId: auth.collegeId, slug, name: cleanText(b.name), kind: b.kind, privacy: b.privacy, description: cleanText(b.description ?? ''), tags: b.tags, avatarFileId: null, membersCount: 1, status: 'active', createdBy: auth.userId, createdAt: now, updatedAt: now },
           { session },
         );
         await members().insertOne({ _id: memberId(id, auth.userId), spaceId: id, userId: auth.userId, role: 'owner', status: 'active', joinedAt: now }, { session });
@@ -157,8 +157,8 @@ export const spaceRoutes: FastifyPluginAsync = async (base) => {
       return reply.status(201).send({
         id,
         slug,
-        status,
-        message: status === 'pending' ? 'Your space was sent for approval. You will be notified when it goes live.' : 'Your space is live.',
+        status: 'active',
+        message: 'Your space is live.',
       });
     },
   );

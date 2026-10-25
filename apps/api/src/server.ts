@@ -46,6 +46,14 @@ async function main() {
     }
   }
 
+  // Spaces go live as soon as they are created now, so release any that were waiting for approval.
+  try {
+    const released = await deps.db.col('spaces').updateMany({ status: 'pending' }, { $set: { status: 'active', updatedAt: new Date() } });
+    if (released.modifiedCount) logger.info({ count: released.modifiedCount }, 'released spaces that were waiting for approval');
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, 'could not release pending spaces');
+  }
+
   const app = await buildApp(deps);
   if (config.jobsEnabled) {
     registerJobs(deps);
