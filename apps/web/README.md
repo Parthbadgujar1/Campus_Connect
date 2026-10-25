@@ -11,7 +11,7 @@ Every screen reads live data from the CampusConnect API (`apps/api`).
 ## Run it
 
 ```bash
-# from campus-connect/, with the API running on http://127.0.0.1:4000
+# from the repo root, with the API running on http://127.0.0.1:4000
 npm run dev --workspace=web          # http://localhost:3000
 npm run type-check --workspace=web
 npm run build --workspace=web

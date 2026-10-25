@@ -5,8 +5,8 @@
 **/.turbo
 **/*.tsbuildinfo
 .git
-apps/api/.env
-apps/api/var
-apps/api/seed-assets
+.claude
 **/.env
 **/.env.local
+apps/api/var
+apps/api/seed-assets

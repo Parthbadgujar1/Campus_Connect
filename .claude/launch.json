@@ -6,7 +6,7 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "--prefix",
-        "campus-connect/apps/web",
+        "apps/web",
         "run",
         "dev"
       ],
@@ -17,7 +17,7 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "--prefix",
-        "campus-connect/apps/api",
+        "apps/api",
         "run",
         "dev"
       ],
@@ -28,7 +28,7 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "--prefix",
-        "campus-connect/apps/web",
+        "apps/web",
         "run",
         "dev:alt"
       ],
@@ -39,7 +39,7 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": [
         "--prefix",
-        "campus-connect/apps/api",
+        "apps/api",
         "run",
         "dev"
       ],

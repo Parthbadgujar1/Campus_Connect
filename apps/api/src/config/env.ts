@@ -65,6 +65,9 @@ const schema = z.object({
   COOKIE_DOMAIN: optionalString,
 
   MAIL_TRANSPORT: z.enum(['dev', 'smtp']).default('dev'),
+  // Lets production start with the built-in dev mailbox (messages are kept in Admin → System → Email
+  // instead of being sent). For a first deploy before SMTP is set up; real sign-ups need SMTP.
+  ALLOW_DEV_MAIL: bool(false),
   MAIL_FROM: z.string().default('CampusConnect <no-reply@campusconnect.local>'),
   SMTP_HOST: optionalString,
   SMTP_PORT: z.coerce.number().int().default(587),
@@ -115,7 +118,8 @@ export function parseConfig(source: NodeJS.ProcessEnv = process.env) {
       if (env[key] === DEV_SECRET) problems.push(`${key} must be set to a unique random value`);
     }
     if (!env.COOKIE_SECURE) problems.push('COOKIE_SECURE must be true in production');
-    if (env.MAIL_TRANSPORT !== 'smtp' || !env.SMTP_HOST) problems.push('MAIL_TRANSPORT=smtp and SMTP_HOST are required');
+    const devMailAllowed = env.ALLOW_DEV_MAIL && env.MAIL_TRANSPORT === 'dev';
+    if (!devMailAllowed && (env.MAIL_TRANSPORT !== 'smtp' || !env.SMTP_HOST)) problems.push('MAIL_TRANSPORT=smtp and SMTP_HOST are required (or ALLOW_DEV_MAIL=true to keep emails in the admin console)');
     if (env.STORAGE_DRIVER === 's3' && (!env.S3_BUCKET || !env.S3_ACCESS_KEY_ID || !env.S3_SECRET_ACCESS_KEY)) {
       problems.push('S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required for STORAGE_DRIVER=s3');
     }
