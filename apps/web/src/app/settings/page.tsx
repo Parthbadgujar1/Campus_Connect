@@ -57,7 +57,7 @@ export default function SettingsPage() {
         <Card className="divide-y divide-border overflow-hidden">
           <ListRow icon={Lock} title="Privacy controls" subtitle="Who can see your profile and message you" href="/settings/privacy" />
           <ListRow icon={ShieldHalf} title="Blocked people & my reports" subtitle="Unblock people and see what happened to your reports" href="/settings/privacy#blocked" />
-          <ListRow icon={Database} title="Your data & account" subtitle="Download a copy of your data, or delete your account" href="/settings/data" />
+          <ListRow icon={Database} title="Your data & account" subtitle="Delete your account" href="/settings/data" />
           <ListRow icon={Cookie} title="Cookie settings" subtitle="Only necessary cookies are on unless you choose otherwise" onClick={openCookieSettings} />
           <ListRow icon={ShieldAlert} title="Safety & emergency" subtitle="Emergency contacts and helplines" href="/safety" />
         </Card>

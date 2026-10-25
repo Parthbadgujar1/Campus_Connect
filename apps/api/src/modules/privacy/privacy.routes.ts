@@ -107,16 +107,14 @@ export const privacyRoutes: FastifyPluginAsync = async (base) => {
       schema: {
         tags: ['privacy'],
         summary: `Delete my account (permanent after ${DELETION_GRACE_DAYS} days; sign in before then to cancel)`,
-        body: z.object({ password: z.string().min(1).max(128), confirm: z.literal('DELETE'), reason: optionalText(500) }),
+        // Being signed in is the verification; the app shows a confirmation pop-up first.
+        body: z.object({ reason: optionalText(500) }),
       },
     },
     async (request, reply) => {
       const auth = requireAuth(request);
-      const user = await users().findOne({ _id: auth.userId }, { projection: { passwordHash: 1, email: 1, 'profile.displayName': 1, deletionScheduledFor: 1 } });
+      const user = await users().findOne({ _id: auth.userId }, { projection: { email: 1, 'profile.displayName': 1, deletionScheduledFor: 1 } });
       if (!user) throw Errors.unauthenticated();
-      if (!(await verifyPassword(user.passwordHash, request.body.password))) {
-        throw Errors.validation([{ field: 'password', message: 'Your password is not correct.' }]);
-      }
       if (user.deletionScheduledFor) return { status: 'scheduled', scheduledFor: user.deletionScheduledFor.toISOString() };
       const scheduledFor = new Date(Date.now() + DELETION_GRACE_DAYS * 86_400_000);
       const now = new Date();

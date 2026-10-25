@@ -91,6 +91,9 @@ export function CommentsSheet({ postId, count, onClose, onCountChange }: { postI
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 maxLength={2000}
+                enterKeyHint="send"
+                autoCapitalize="sentences"
+                autoComplete="off"
                 placeholder={replyTo ? 'Write a reply' : 'Add a comment'}
                 aria-label={replyTo ? 'Write a reply' : 'Add a comment'}
                 className="h-11 min-w-0 flex-1 rounded-full border border-border bg-surface px-4 text-[15px] focus:border-accent focus:outline-none"

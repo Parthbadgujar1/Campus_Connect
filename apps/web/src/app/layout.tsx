@@ -32,6 +32,9 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  // On Android (Gboard and others) the on-screen keyboard shrinks the page instead of covering the
+  // message box, so inputs stay visible while typing.
+  interactiveWidget: 'resizes-content',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#f6f4ff' },
     { media: '(prefers-color-scheme: dark)', color: '#000000' },

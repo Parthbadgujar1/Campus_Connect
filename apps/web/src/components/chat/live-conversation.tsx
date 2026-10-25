@@ -123,7 +123,7 @@ function Bubble({ m, chat, onReply, onChange, onOpenMedia, onActions, onRetry, o
             'This message was deleted'
           ) : editing ? (
             <form className="flex min-w-[220px] flex-col gap-2" onSubmit={(e) => { e.preventDefault(); if (text.trim()) void edit.run(); }}>
-              <Input value={text} onChange={(e) => setText(e.target.value)} maxLength={4000} autoFocus aria-label="Edit message" className="h-10 bg-surface text-text" />
+              <Input value={text} onChange={(e) => setText(e.target.value)} maxLength={4000} autoFocus enterKeyHint="done" aria-label="Edit message" className="h-10 bg-surface text-text" />
               <div className="flex gap-2">
                 <Button type="submit" size="sm" disabled={edit.pending}>Save</Button>
                 <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
@@ -771,6 +771,9 @@ export function LiveConversation({ chatId }: { chatId: string }) {
                 }}
                 rows={1}
                 maxLength={4000}
+                enterKeyHint="send"
+                autoCapitalize="sentences"
+                autoCorrect="on"
                 placeholder="Message"
                 aria-label="Message"
                 className="max-h-36 min-h-11 flex-1 resize-none rounded-2xl border border-border bg-surface px-4 py-2.5 text-[15px] focus:border-accent focus:outline-none"

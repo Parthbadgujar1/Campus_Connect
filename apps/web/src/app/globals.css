@@ -710,3 +710,13 @@
   border-radius: 9999px;
   background: #fff;
 }
+
+/* Touch screens: 16px fields stop iPhones zooming the page in when a field is tapped. This sits outside
+   the cascade layers on purpose, so it wins over the smaller sizes set on individual inputs. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='color']),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

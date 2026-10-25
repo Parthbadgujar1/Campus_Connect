@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Bookmark, EyeOff, Flag, Heart, Link2, MessageCircle, MoreHorizontal, Play, Send, Trash2, Volume2, VolumeX, ExternalLink } from 'lucide-react';
-import { del, errorMessage, post as apiPost, put } from '@/lib/api/client';
+import { Bookmark, EyeOff, Flag, Gauge, Heart, Link2, MessageCircle, MoreHorizontal, Pencil, Play, Send, Trash2, Volume2, VolumeX, ExternalLink } from 'lucide-react';
+import { del, errorMessage, patch, post as apiPost, put } from '@/lib/api/client';
 import { invalidate } from '@/lib/api/hooks';
 import type { PostView } from '@/lib/api/types';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/fields';
 import { PersonAvatar } from '@/components/ui/person-avatar';
 import { Sheet } from '@/components/ui/sheet';
 import { ConfirmDialog } from '@/components/ui/states';
@@ -40,9 +42,14 @@ interface Props {
   onChange: (p: PostView) => void;
   onFollowAuthor: (authorId: string) => void;
   onRemove: (id: string, reason: 'deleted' | 'hidden') => void;
+  /** Playback speed shared by every loop (1 = normal). */
+  speed: number;
+  onSpeedChange: (speed: number) => void;
 }
 
-export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChange, onFollowAuthor, onRemove }: Props) {
+const SPEEDS = [1, 1.5, 2, 0.5];
+
+export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChange, onFollowAuthor, onRemove, speed, onSpeedChange }: Props) {
   const toast = useToast();
   const router = useRouter();
   const video = useRef<HTMLVideoElement | null>(null);
@@ -56,7 +63,9 @@ export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChan
   const [bursts, setBursts] = useState<Array<{ id: number; x: number; y: number }>>([]);
   const [flash, setFlash] = useState<'muted' | 'sound' | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [sheet, setSheet] = useState<'comments' | 'share' | 'more' | 'report' | 'delete' | null>(null);
+  const [sheet, setSheet] = useState<'comments' | 'share' | 'more' | 'report' | 'delete' | 'edit' | null>(null);
+  const [draft, setDraft] = useState('');
+  const [savingCaption, setSavingCaption] = useState(false);
   const counted = useRef(false);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -104,6 +113,9 @@ export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChan
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, [active, paused, play]);
+  useEffect(() => {
+    if (video.current) video.current.playbackRate = speed;
+  }, [speed, clip?.url, active]);
   // Keep the element's muted flag in step with the shared choice.
   useEffect(() => {
     if (video.current) video.current.muted = muted;
@@ -140,6 +152,21 @@ export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChan
       toast(`Following ${post.author.displayName.split(' ')[0]}`);
     } catch (err) {
       toast(errorMessage(err));
+    }
+  };
+  const saveCaption = async () => {
+    const body = draft.trim();
+    if (!body || savingCaption) return;
+    setSavingCaption(true);
+    try {
+      const next = await patch<PostView>(`/posts/${post.id}`, { body });
+      onChange(next);
+      toast('Caption updated');
+      setSheet(null);
+    } catch (err) {
+      toast(errorMessage(err));
+    } finally {
+      setSavingCaption(false);
     }
   };
   const remove = async () => {
@@ -221,6 +248,12 @@ export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChan
         }
       } else if (e.key === 'm') onMuteChange(!muted);
       else if (e.key === 'l') void like();
+      else if (e.key === 'c') setSheet('comments');
+      else if (e.key === 's') void save();
+      else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && video.current && Number.isFinite(video.current.duration)) {
+        e.preventDefault();
+        video.current.currentTime = Math.max(0, Math.min(video.current.duration, video.current.currentTime + (e.key === 'ArrowRight' ? 5 : -5)));
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -380,12 +413,23 @@ export function LoopPlayer({ post, active, distance, muted, onMuteChange, onChan
       {sheet === 'share' && <ShareSheet path={link} title={caption ? caption.slice(0, 80) : 'A loop on CampusConnect'} onClose={() => setSheet(null)} />}
       <Sheet open={sheet === 'more'} onClose={() => setSheet(null)} title="Loop options">
         <div className="-mx-2 flex flex-col">
+          <ActionRow icon={muted ? Volume2 : VolumeX} label={muted ? 'Turn sound on' : 'Mute'} onClick={() => { onMuteChange(!muted); setSheet(null); }} />
+          <ActionRow icon={Gauge} label={`Playback speed: ${speed}×`} hint="Tap to change" onClick={() => onSpeedChange(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length] ?? 1)} />
+          {post.isMine && <ActionRow icon={Pencil} label="Edit caption" onClick={() => { setDraft(post.body); setSheet('edit'); }} />}
           <ActionRow icon={Link2} label="Copy link" onClick={() => { void navigator.clipboard.writeText(`${window.location.origin}${link}`).then(() => toast('Link copied')).catch(() => toast('Could not copy the link')); setSheet(null); }} />
           <ActionRow icon={ExternalLink} label="Open as a post" onClick={() => router.push(`/post/${post.id}`)} />
           {!post.isMine && <ActionRow icon={EyeOff} label="Not interested" hint="Hide this loop for now" onClick={() => { setSheet(null); onRemove(post.id, 'hidden'); toast('Hidden. You will see fewer like this.'); }} />}
           {!post.isMine && <ActionRow icon={Flag} label="Report" danger onClick={() => setSheet('report')} />}
           {post.isMine && <ActionRow icon={Trash2} label="Delete" danger onClick={() => setSheet('delete')} />}
         </div>
+      </Sheet>
+      <Sheet
+        open={sheet === 'edit'}
+        onClose={() => setSheet(null)}
+        title="Edit caption"
+        footer={<Button full disabled={!draft.trim() || savingCaption} onClick={() => void saveCaption()}>Save</Button>}
+      >
+        <Textarea value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={5000} rows={5} autoCapitalize="sentences" aria-label="Caption" placeholder="Write a caption… use #hashtags" />
       </Sheet>
       {sheet === 'report' && <ReportSheet open onClose={() => setSheet(null)} targetType="post" targetId={post.id} label="this loop" />}
       <ConfirmDialog open={sheet === 'delete'} onClose={() => setSheet(null)} onConfirm={() => void remove()} title="Delete this loop?" description="It is removed for everyone, with its likes and comments." confirmLabel="Delete" danger />

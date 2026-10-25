@@ -3,13 +3,14 @@
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Camera, CheckCircle2, ChevronDown, ChevronUp, Clapperboard, RotateCcw, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowUp, Camera, CheckCircle2, ChevronDown, ChevronUp, Clapperboard, RotateCcw, UsersRound } from 'lucide-react';
 import { errorMessage, get, withQuery } from '@/lib/api/client';
 import { useInfinite, useQuery, type Page } from '@/lib/api/hooks';
 import type { PostView } from '@/lib/api/types';
 import { buttonClass } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/states';
 import { LoopPlayer } from '@/components/loops/loop-player';
+import { useLive } from '@/lib/realtime';
 import { NewLoop } from '@/components/loops/new-loop';
 import { cn } from '@/lib/utils';
 
@@ -52,6 +53,8 @@ function LoopsInner() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [hidden, setHidden] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [hasNew, setHasNew] = useState(false);
   const [mine, setMine] = useState<PostView[]>([]);
   const scroller = useRef<HTMLDivElement | null>(null);
   const sentinel = useRef<HTMLDivElement | null>(null);
@@ -74,6 +77,53 @@ function LoopsInner() {
   }, [mine, first.data, feed.items, hidden, edits]);
 
   const activeIndex = Math.max(0, items.findIndex((p) => p.id === activeId));
+
+  // ---- live: counts on the loops around the one you are watching stay current, and a "New loops"
+  // button appears when someone posts. The server announces a change to the feed; we fetch only what we show.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const activeRef = useRef(activeId);
+  activeRef.current = activeId;
+  const liveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(liveTimer.current), []);
+  useLive(null, (e) => {
+    if (e.type !== 'changed' || !e.topics.includes('feed') || liveTimer.current) return;
+    liveTimer.current = setTimeout(async () => {
+      liveTimer.current = undefined;
+      if (document.hidden) return;
+      const list = itemsRef.current;
+      const at = Math.max(0, list.findIndex((p) => p.id === activeRef.current));
+      const near = list.slice(Math.max(0, at - 1), at + 2);
+      const fresh = await Promise.all(near.map((p) => get<PostView>(`/posts/${p.id}`).catch(() => null)));
+      setEdits((m) => {
+        const next = { ...m };
+        fresh.forEach((f, i) => {
+          if (f) next[near[i]!.id] = f;
+        });
+        return next;
+      });
+    }, 1500);
+  });
+  // A loop that lands above the one you are watching (the list keeps you where you are) gets a button.
+  const knownIds = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!items.length) return;
+    if (!knownIds.current) {
+      knownIds.current = new Set(items.map((p) => p.id));
+      return;
+    }
+    const known = knownIds.current;
+    const fresh = items.filter((p) => !known.has(p.id));
+    items.forEach((p) => known.add(p.id));
+    if (fresh.some((p) => !p.isMine && items.findIndex((x) => x.id === p.id) < activeIndex)) setHasNew(true);
+  }, [items, activeIndex]);
+  useEffect(() => {
+    if (activeIndex === 0) setHasNew(false);
+  }, [activeIndex]);
+  const showNew = () => {
+    setHasNew(false);
+    scroller.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // The loop that fills most of the screen is the one that plays.
   useEffect(() => {
@@ -160,6 +210,12 @@ function LoopsInner() {
         </div>
       </div>
 
+      {hasNew && (
+        <button type="button" onClick={showNew} className="absolute left-1/2 top-[max(4.5rem,calc(env(safe-area-inset-top)+3.75rem))] z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-[14px] font-semibold text-black shadow-lg">
+          <ArrowUp className="h-4 w-4" aria-hidden="true" /> New loops
+        </button>
+      )}
+
       {/* Up / down on desktop */}
       {items.length > 1 && (
         <div className="absolute right-6 top-1/2 z-30 hidden -translate-y-1/2 flex-col gap-3 md:flex">
@@ -190,6 +246,8 @@ function LoopsInner() {
             onChange={change}
             onFollowAuthor={followAuthor}
             onRemove={remove}
+            speed={speed}
+            onSpeedChange={setSpeed}
           />
         ))}
         {feed.hasMore && <div ref={sentinel} className="grid h-24 place-items-center">{feed.loadingMore && <Spinner />}</div>}
