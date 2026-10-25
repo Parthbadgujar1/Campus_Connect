@@ -50,7 +50,10 @@ export class Mongo {
       maxIdleTimeMS: 60_000,
       serverSelectionTimeoutMS: 3_000,
       connectTimeoutMS: 3_000,
-      timeoutMS: options.operationTimeoutMs,
+      // A socket timeout rather than the driver's client-wide timeoutMS: with timeoutMS set, mongodb 7.x
+      // rejects insertMany/bulkWrite inside withTransaction ("An operation cannot be given a timeoutMS
+      // setting..."), which broke sign-up on replica sets such as MongoDB Atlas.
+      socketTimeoutMS: options.operationTimeoutMs,
       retryWrites: true,
       retryReads: true,
       readPreference: 'primaryPreferred',
