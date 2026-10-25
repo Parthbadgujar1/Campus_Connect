@@ -28,6 +28,7 @@ interface CollegeRow {
   status: 'active' | 'suspended';
   people: number;
   departments: number;
+  departmentNames: string[];
   createdAt: string;
 }
 
@@ -38,8 +39,9 @@ function CollegeSheet({ college, onClose }: { college: CollegeRow | null; onClos
   const set = (k: keyof typeof form, v: string) => setForm((f) => ({ ...f, [k]: v }));
   const save = useAction(async () => {
     const body = { name: form.name.trim(), shortName: form.shortName.trim(), city: form.city.trim() || null, state: form.state.trim() || null };
-    if (college) await patch(`/admin/colleges/${college.id}`, body);
-    else await post('/admin/colleges', { ...body, departments: departments.split('\n').map((d) => d.trim()).filter(Boolean) });
+    const names = departments.split('\n').map((d) => d.trim()).filter(Boolean);
+    if (college) await patch(`/admin/colleges/${college.id}`, { ...body, addDepartments: names.length ? names : undefined });
+    else await post('/admin/colleges', { ...body, departments: names });
     invalidate('admin:colleges', 'meta:colleges');
     toast(college ? 'College updated' : 'College added. It now appears on the sign-up form.');
     onClose();
@@ -54,11 +56,23 @@ function CollegeSheet({ college, onClose }: { college: CollegeRow | null; onClos
           <Field label="City" htmlFor="col-city"><Input id="col-city" value={form.city} onChange={(e) => set('city', e.target.value)} maxLength={80} /></Field>
           <Field label="State" htmlFor="col-state"><Input id="col-state" value={form.state} onChange={(e) => set('state', e.target.value)} maxLength={80} /></Field>
         </div>
-        {!college && (
-          <Field label="Departments (optional)" htmlFor="col-depts" hint="One per line. Students pick one when they set up their profile.">
-            <Textarea id="col-depts" rows={5} value={departments} onChange={(e) => setDepartments(e.target.value)} placeholder={'Computer Engineering\nInformation Technology\nMechanical Engineering'} />
-          </Field>
+        {college && (
+          <div>
+            <p className="font-sans mb-1.5 text-sm font-semibold">Departments ({college.departmentNames.length})</p>
+            {college.departmentNames.length ? (
+              <ul className="flex flex-wrap gap-1.5">
+                {college.departmentNames.map((d) => (
+                  <li key={d} className="font-sans rounded-full border border-border bg-surface px-2.5 py-1 text-[12px]">{d}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[13px] text-text-3">None yet. Add some below so students can pick theirs.</p>
+            )}
+          </div>
         )}
+        <Field label={college ? 'Add departments' : 'Departments (optional)'} htmlFor="col-depts" hint="One per line. Students pick one when they set up their profile.">
+          <Textarea id="col-depts" rows={5} value={departments} onChange={(e) => setDepartments(e.target.value)} placeholder={'Computer Engineering\nInformation Technology\nMechanical Engineering'} />
+        </Field>
         {save.error && <FormAlert>{save.error.message}</FormAlert>}
       </div>
     </Sheet>

@@ -705,10 +705,31 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
     const deps = await db.col('departments').aggregate<{ _id: string; n: number }>([{ $group: { _id: '$collegeId', n: { $sum: 1 } } }]).toArray();
     const people = new Map(counts.map((c) => [c._id, c.n]));
     const departments = new Map(deps.map((c) => [c._id, c.n]));
+    const deptNames = new Map<string, string[]>();
+    for (const d of await db.col('departments').find({}, { projection: { collegeId: 1, name: 1 } }).sort({ name: 1 }).limit(5000).toArray()) deptNames.set(d.collegeId, [...(deptNames.get(d.collegeId) ?? []), d.name]);
     return {
-      items: rows.map((c) => ({ id: c._id, name: c.name, shortName: c.shortName, slug: c.slug, city: c.city, state: c.state, status: c.status, people: people.get(c._id) ?? 0, departments: departments.get(c._id) ?? 0, createdAt: c.createdAt.toISOString() })),
+      items: rows.map((c) => ({ id: c._id, name: c.name, shortName: c.shortName, slug: c.slug, city: c.city, state: c.state, status: c.status, people: people.get(c._id) ?? 0, departments: departments.get(c._id) ?? 0, departmentNames: deptNames.get(c._id) ?? [], createdAt: c.createdAt.toISOString() })),
     };
   });
+
+  /** Department documents for the given names, skipping any already present, each with a short unique code. */
+  const departmentDocs = (collegeId: string, names: string[], existing: Array<{ code: string; name: string }>, now: Date) => {
+    const taken = new Set(existing.map((d) => d.name.toLowerCase()));
+    const used = new Set(existing.map((d) => d.code));
+    const docs: Array<{ _id: string; collegeId: string; code: string; name: string; createdAt: Date }> = [];
+    for (const name of [...new Set(names.map((n) => cleanText(n)))]) {
+      if (taken.has(name.toLowerCase())) continue;
+      taken.add(name.toLowerCase());
+      let code = name.replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).map((w) => w[0]!.toUpperCase()).join('').slice(0, 8) || 'DEPT';
+      if (code.length < 2) code = `${code}X`;
+      let n = 2;
+      const base = code;
+      while (used.has(code)) code = `${base.slice(0, 10)}${n++}`;
+      used.add(code);
+      docs.push({ _id: uuidv7(), collegeId, code, name, createdAt: now });
+    }
+    return docs;
+  };
 
   const collegeBody = z.object({
     name: text(3, 160),
@@ -734,16 +755,7 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
         { _id: id, slug, name: cleanText(b.name), shortName: cleanText(b.shortName), city: b.city ? cleanText(b.city) : null, state: b.state ? cleanText(b.state) : null, timezone: 'Asia/Kolkata', shard: 'default', status: 'active', domains: [], settings: {}, createdAt: now, updatedAt: now },
         { session },
       );
-      const used = new Set<string>();
-      const deptDocs = [...new Set(b.departments.map((d) => cleanText(d)))].map((name) => {
-        let code = name.replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).map((w) => w[0]!.toUpperCase()).join('').slice(0, 8) || 'DEPT';
-        if (code.length < 2) code = `${code}X`;
-        let n = 2;
-        const base = code;
-        while (used.has(code)) code = `${base.slice(0, 10)}${n++}`;
-        used.add(code);
-        return { _id: uuidv7(), collegeId: id, code, name, createdAt: now };
-      });
+      const deptDocs = departmentDocs(id, b.departments, [], now);
       if (deptDocs.length) await db.col('departments').insertMany(deptDocs, { session });
       await audit(db, { action: 'admin.college_create', actorId: auth.userId, actorRole: auth.role, collegeId: auth.collegeId, entityType: 'college', entityId: id, requestId: request.id, meta: { name: b.name } }, session);
     });
@@ -753,7 +765,7 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
 
   app.patch(
     '/colleges/:id',
-    { schema: { tags: ['admin'], summary: 'Rename a college, or pause new sign-ups to it', params: idParam, body: z.object({ name: text(3, 160).optional(), shortName: text(2, 40).optional(), city: optionalText(80), state: optionalText(80), status: z.enum(['active', 'suspended']).optional() }) } },
+    { schema: { tags: ['admin'], summary: 'Rename a college, pause new sign-ups to it, or add departments', params: idParam, body: z.object({ name: text(3, 160).optional(), shortName: text(2, 40).optional(), city: optionalText(80), state: optionalText(80), status: z.enum(['active', 'suspended']).optional(), addDepartments: z.array(text(2, 120)).max(40).optional() }) } },
     async (request) => {
       const auth = requireRole(request, 'admin');
       const b = request.body;
@@ -768,6 +780,11 @@ export const adminRoutes: FastifyPluginAsync = async (base) => {
       }
       const res = await db.col('colleges').updateOne({ _id: request.params.id }, { $set: set });
       if (!res.matchedCount) throw Errors.notFound('This college');
+      if (b.addDepartments?.length) {
+        const existing = await db.col('departments').find({ collegeId: request.params.id }, { projection: { code: 1, name: 1 } }).toArray();
+        const docs = departmentDocs(request.params.id, b.addDepartments, existing, new Date());
+        if (docs.length) await db.col('departments').insertMany(docs);
+      }
       await audit(db, { action: 'admin.college_update', actorId: auth.userId, actorRole: auth.role, collegeId: auth.collegeId, entityType: 'college', entityId: request.params.id, requestId: request.id, meta: b });
       await app.deps.cache.del('meta:colleges');
       return { status: 'saved' };
